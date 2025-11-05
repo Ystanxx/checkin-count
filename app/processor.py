@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, date, time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -46,7 +46,7 @@ class DailyRecord:
 # 常量与工具函数
 # ==============================
 
-# 时间窗口边界
+# 时间窗口边界（常量）
 AM_CUTOFF = time(9, 4, 59)               # AM窗口：<= 09:04:59
 NOON_START = time(11, 0, 0)               # NOON窗口：>= 11:00:00
 NOON_END = time(14, 4, 59)                # NOON窗口：<= 14:04:59
@@ -56,6 +56,26 @@ def _to_int(val) -> Optional[int]:
     """尝试将单元格值转换为整数，如果失败则返回None。"""
     if pd.isna(val):
         return None
+
+
+def _to_day(val) -> Optional[int]:
+    """从单元格值中更鲁棒地提取日号(1..31)。
+
+    兼容：全角数字、带“日”后缀或其他非数字装饰。
+    """
+    if pd.isna(val):
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    s = _to_ascii_fullwidth(s)
+    m = re.match(r"^\D*(\d{1,2})\D*$", s)
+    if not m:
+        return None
+    d = int(m.group(1))
+    if 1 <= d <= 31:
+        return d
+    return None
     try:
         s = str(val).strip()
         if s == "":
@@ -65,7 +85,21 @@ def _to_int(val) -> Optional[int]:
         return None
 
 
-def _norm_time_token(token: str) -> Optional[str]:
+def _to_ascii_fullwidth(s: str) -> str:
+    """将常见全角数字与标点转为半角ASCII。"""
+    if not s:
+        return s
+    # 全角数字 ０-９, 冒号：，逗号，分号；，斜杠／，空格　
+    trans = {
+        ord("０"): "0", ord("１"): "1", ord("２"): "2", ord("３"): "3", ord("４"): "4",
+        ord("５"): "5", ord("６"): "6", ord("７"): "7", ord("８"): "8", ord("９"): "9",
+        ord("："): ":", ord("，"): ",", ord("；"): ";", ord("／"): "/", ord("、"): ",",
+        ord("　"): " ",
+    }
+    return s.translate(trans)
+
+
+def _norm_time_token(token: Union[str, int, float, time, datetime, pd.Timestamp]) -> Optional[str]:
     """将一个时间token标准化为HH:MM:SS。
 
     支持格式：
@@ -73,14 +107,47 @@ def _norm_time_token(token: str) -> Optional[str]:
     - HMM/HHMM 例如 835/0835/1835
     失败则返回None。
     """
-    if token is None:
+    if token is None or (isinstance(token, float) and pd.isna(token)):
         return None
+
+    # 直接处理时间型
+    if isinstance(token, time):
+        return f"{token.hour:02d}:{token.minute:02d}:{token.second:02d}"
+    if isinstance(token, (datetime, pd.Timestamp)):
+        t = token.time()
+        return f"{t.hour:02d}:{t.minute:02d}:{t.second:02d}"
+
+    # 处理纯数字（Excel可能读成int/float，如903/905）
+    if isinstance(token, (int,)) or (isinstance(token, float) and token.is_integer()):
+        n = int(token)
+        if 0 <= n <= 2359:
+            if n < 100:  # 例如 5 -> 00:05:00，不太像有效数据，忽略
+                return None
+            if n < 1000:
+                hh = n // 100
+                mm = n % 100
+            else:
+                hh = n // 100
+                mm = n % 100
+            if 0 <= hh <= 23 and 0 <= mm <= 59:
+                return f"{hh:02d}:{mm:02d}:00"
+        return None
+
+    # 处理Excel时间序列（float分数，0~1代表一天的小数）
+    if isinstance(token, float) and 0 < token < 1:
+        total_seconds = int(round(token * 24 * 3600))
+        hh = (total_seconds // 3600) % 24
+        mm = (total_seconds % 3600) // 60
+        ss = total_seconds % 60
+        return f"{hh:02d}:{mm:02d}:{ss:02d}"
+
     s = str(token).strip()
     if not s:
         return None
+    s = _to_ascii_fullwidth(s)
 
     # 1) 带冒号
-    m = re.match(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?$", s)
+    m = re.match(r"^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$", s)
     if m:
         hh = int(m.group(1))
         mm = int(m.group(2))
@@ -137,22 +204,25 @@ def _extract_name_from_row(row_values: List) -> Optional[str]:
 
     优先匹配“姓名：XXX”；否则取“姓名”所在单元格右侧第一个非空值。
     """
-    # 先查带冒号的形式
+    # 先查带冒号/含内容的单格（鲁棒：允许“姓 名”“：/:”与可选空格）
+    name_regex = re.compile(r"姓\s*名\s*[：:]\s*([^\s:：\-\|]+)")
     for val in row_values:
         if pd.isna(val):
             continue
-        s = str(val).strip()
-        if s.startswith("姓名：") or s.startswith("姓名:"):
-            name = s.split("：", 1)[-1].split(":", 1)[-1].strip()
+        s = _to_ascii_fullwidth(str(val)).strip()
+        m = name_regex.search(s)
+        if m:
+            name = m.group(1).strip()
             if name:
                 return name
 
-    # 再查“姓名”+右侧非空
+    # 再查“姓名/姓名：”+右侧非空
     for idx, val in enumerate(row_values):
         if pd.isna(val):
             continue
-        s = str(val).strip()
-        if s == "姓名":
+        s = _to_ascii_fullwidth(str(val)).strip()
+        s_clean = s.replace("：", "").replace(":", "").strip()
+        if s_clean == "姓名":
             # 向右搜索第一个非空
             for j in range(idx + 1, len(row_values)):
                 v = row_values[j]
@@ -164,7 +234,9 @@ def _extract_name_from_row(row_values: List) -> Optional[str]:
 
 
 def _parse_person_block(sheet_df: pd.DataFrame, start_row: int) -> Tuple[Optional[Dict], int]:
-    """尝试从start_row起解析一个人（3行）。
+    """尝试从start_row起解析一个人块（姓名行 + 日期行 + 时刻行）。
+
+    更加健壮：允许姓名行后的1~3行内出现日期行，适配含“工号：x”等额外行的表格。
 
     返回(结果或None, 下一行索引)。
     结果结构：
@@ -174,47 +246,89 @@ def _parse_person_block(sheet_df: pd.DataFrame, start_row: int) -> Tuple[Optiona
     }
     """
     n_rows = sheet_df.shape[0]
-    if start_row + 2 >= n_rows:
+    if start_row >= n_rows:
         return None, start_row + 1
 
     row1 = sheet_df.iloc[start_row].tolist()
-    row2 = sheet_df.iloc[start_row + 1].tolist()
-    row3 = sheet_df.iloc[start_row + 2].tolist()
-
     name = _extract_name_from_row(row1)
     if not name:
         return None, start_row + 1
 
-    # 日期行：收集各列对应的日号
+    # 在姓名行之后的1~3行内寻找“日期行”
+    day_row_idx = None
     col_to_day: Dict[int, int] = {}
-    for c, v in enumerate(row2):
-        day = _to_int(v)
-        if day is not None and 1 <= day <= 31:
-            col_to_day[c] = day
+    for off in (1, 2, 3):
+        idx = start_row + off
+        if idx >= n_rows:
+            break
+        row_candidate = sheet_df.iloc[idx].tolist()
+        tmp_map: Dict[int, int] = {}
+        for c, v in enumerate(row_candidate):
+            day = _to_day(v)
+            if day is not None and 1 <= day <= 31:
+                tmp_map[c] = day
+        if len(tmp_map) >= 5:  # 至少识别到若干天数，判定为日期行
+            day_row_idx = idx
+            col_to_day = tmp_map
+            break
 
-    if not col_to_day:
-        # 没有日期映射，视为失败
+    if day_row_idx is None:
         return None, start_row + 1
 
-    # 第3行：各列拆分时刻
-    sep = re.compile(r"[\s,;/\\]+")  # 空格/逗号/分号/斜杠/反斜杠/换行
+    # 时刻行：允许合并接下来的多行，直到遇到下一个块的迹象
+    sep = re.compile(r"[\s,，,;；/／\\、\-\–\—()（）]+")  # 增强分隔符：含全角、连字符、括号
     day_to_tokens: Dict[int, List[str]] = {}
-    for c, v in enumerate(row3):
-        if c not in col_to_day:
-            continue
-        d = col_to_day[c]
-        if pd.isna(v):
-            continue
-        s = str(v)
-        tokens = [t for t in sep.split(s) if t and t.strip()]
-        if not tokens:
-            continue
-        day_to_tokens.setdefault(d, []).extend(tokens)
+    time_row_idx = day_row_idx + 1
+    cur = time_row_idx
+    max_follow = 3  # 最多合并3行
+    while cur < n_rows and cur <= time_row_idx + max_follow:
+        row_time = sheet_df.iloc[cur].tolist()
 
-    return {"name": name, "day_to_tokens": day_to_tokens}, start_row + 3
+        # 碰到下一位人员的姓名/工号提示则停止
+        joined = " ".join([str(x) for x in row_time if not pd.isna(x)])
+        if "姓名" in joined or "工号" in joined:
+            break
+
+        # 如果该行看起来又是日期行（>=5个日号），也停止
+        count_days = 0
+        for v in row_time:
+            dtmp = _to_day(v)
+            if dtmp is not None and 1 <= dtmp <= 31:
+                count_days += 1
+        if count_days >= 5:
+            break
+
+        # 解析本行时间（支持“日号列→下一日号列之间”为同一日的列范围）
+        n_cols = sheet_df.shape[1]
+        if col_to_day:
+            # 构建列到日的全覆盖映射
+            sorted_cols = sorted(col_to_day.items(), key=lambda x: x[0])
+            col_day_full: Dict[int, int] = {}
+            for i, (c_start, dval) in enumerate(sorted_cols):
+                c_end = (sorted_cols[i + 1][0] - 1) if i + 1 < len(sorted_cols) else (n_cols - 1)
+                for cc in range(c_start, c_end + 1):
+                    col_day_full[cc] = dval
+        else:
+            col_day_full = {}
+
+        for c, v in enumerate(row_time):
+            if c not in col_day_full:
+                continue
+            d = col_day_full[c]
+            if pd.isna(v):
+                continue
+            s = _to_ascii_fullwidth(str(v))
+            tokens = [t for t in sep.split(s) if t and t.strip()]
+            if not tokens:
+                continue
+            day_to_tokens.setdefault(d, []).extend(tokens)
+
+        cur += 1
+
+    return {"name": name, "day_to_tokens": day_to_tokens}, cur
 
 
-def parse_excel_files(file_paths: List[str]) -> pd.DataFrame:
+def parse_excel_files(file_paths: List[str], start_row: Optional[int] = None) -> pd.DataFrame:
     """读取多个Excel文件并解析成长表结构。
 
     返回DataFrame列：['姓名','日','时间','窗口','源文件','工作表']
@@ -224,17 +338,25 @@ def parse_excel_files(file_paths: List[str]) -> pd.DataFrame:
 
     for f in file_paths:
         try:
-            xls = pd.ExcelFile(f)
+            # 按扩展名选择引擎，增强对.xls的兼容；.xlsx显式使用openpyxl
+            lower = f.lower()
+            engine = None
+            if lower.endswith(".xls"):
+                engine = "xlrd"
+            elif lower.endswith(".xlsx") or lower.endswith(".xlsm"):
+                engine = "openpyxl"
+            xls = pd.ExcelFile(f, engine=engine)
         except Exception:
             continue
 
         for sheet_name in xls.sheet_names:
             try:
-                df = pd.read_excel(f, sheet_name=sheet_name, header=None, dtype=object)
+                df = pd.read_excel(f, sheet_name=sheet_name, header=None, dtype=object, engine=engine)
             except Exception:
                 continue
 
-            r = 0
+            # 自动探测：若start_row为None，则从0开始全表扫描
+            r = 0 if start_row is None else max(0, int(start_row))
             while r < df.shape[0]:
                 res, next_r = _parse_person_block(df, r)
                 if res is None:
@@ -268,7 +390,13 @@ def parse_excel_files(file_paths: List[str]) -> pd.DataFrame:
 # 聚合与汇总
 # ==============================
 
-def aggregate_daily(df_long: pd.DataFrame, year: int, month: int, rest_days: List[int]) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def aggregate_daily(
+    df_long: pd.DataFrame,
+    year: int,
+    month: int,
+    rest_days: List[int],
+    names_all: Optional[List[str]] = None,
+) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """根据长表聚合生成明细与汇总。
 
     参数:
@@ -286,8 +414,14 @@ def aggregate_daily(df_long: pd.DataFrame, year: int, month: int, rest_days: Lis
     need_days = [d for d in range(1, mdays + 1) if d not in rest_set]
 
     # 构建逐人逐日窗口聚合
+    # 汇总姓名集合：包含所有出现过的姓名 + 传入的全量姓名（即使无打卡也纳入）
+    names_set = set(df_long["姓名"].unique()) if not df_long.empty else set()
+    if names_all:
+        names_set.update([n for n in names_all if n])
+
     results_detail: List[Dict] = []
-    for name, sub in df_long.groupby("姓名"):
+    for name in sorted(names_set):
+        sub = df_long[df_long["姓名"] == name] if not df_long.empty else pd.DataFrame(columns=df_long.columns if not df_long.empty else [])
         # 先按日期聚合窗口
         day_map: Dict[int, DailyRecord] = {}
         for d, g in sub.groupby("日"):
@@ -356,3 +490,41 @@ def aggregate_daily(df_long: pd.DataFrame, year: int, month: int, rest_days: Lis
 
     return df_detail, df_summary, df_need_days
 
+
+def parse_all_names(file_paths: List[str], start_row: Optional[int] = None) -> List[str]:
+    """扫描所有文件/工作表，收集出现的姓名（即使没有任何时刻）。"""
+    names: List[str] = []
+    for f in file_paths:
+        try:
+            lower = f.lower()
+            engine = None
+            if lower.endswith(".xls"):
+                engine = "xlrd"
+            elif lower.endswith(".xlsx") or lower.endswith(".xlsm"):
+                engine = "openpyxl"
+            xls = pd.ExcelFile(f, engine=engine)
+        except Exception:
+            continue
+        for sheet_name in xls.sheet_names:
+            try:
+                df = pd.read_excel(f, sheet_name=sheet_name, header=None, dtype=object, engine=engine)
+            except Exception:
+                continue
+            r = 0 if start_row is None else max(0, int(start_row))
+            while r < df.shape[0]:
+                res, next_r = _parse_person_block(df, r)
+                if res is None:
+                    r += 1
+                    continue
+                name = res.get("name")
+                if name:
+                    names.append(name)
+                r = next_r
+    # 去重保持顺序
+    seen = set()
+    uniq = []
+    for n in names:
+        if n not in seen:
+            seen.add(n)
+            uniq.append(n)
+    return uniq

@@ -26,6 +26,9 @@ $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8';
 "C:/Users/stan/.conda/envs/use/python.exe" main_dakaprocess.py
 ```
 
+## 起始行自动探测
+- 默认`数据起始行=1`表示自动探测，会从整张表中扫描`姓名→日期→时刻`模式；仅当特殊场景需要限制搜索范围时，可将其设置为>1的行号。
+
 ## 自检（无界面示例验证与导出）
 ```
 "C:/Users/stan/.conda/envs/use/python.exe" selfcheck.py
@@ -62,4 +65,3 @@ graph TD
   - 汇总表（xlsx + UTF-8 BOM的csv）
   - 可选明细（含AM/NOON标记）
   - “需要打卡日”口径页
-

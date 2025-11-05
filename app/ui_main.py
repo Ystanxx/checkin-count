@@ -3,6 +3,7 @@ from __future__ import annotations
 # 中文注释：Qt界面主窗口
 
 from typing import List
+from datetime import date
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -26,6 +27,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from app.processor import month_days
 
 
 class MainWindow(QMainWindow):
@@ -60,16 +63,22 @@ class MainWindow(QMainWindow):
 
         self.year_spin = QSpinBox()
         self.year_spin.setRange(1970, 2100)
-        self.year_spin.setValue(QApplication.instance().arguments()[0:0] and 2024 or 2024)
 
         self.month_spin = QSpinBox()
         self.month_spin.setRange(1, 12)
-        self.month_spin.setValue(1)
 
         ym_top.addWidget(QLabel("年份"))
         ym_top.addWidget(self.year_spin)
         ym_top.addWidget(QLabel("月份"))
         ym_top.addWidget(self.month_spin)
+        # 新增：数据起始行（1基），用于跳过表头
+        self.start_row_spin = QSpinBox()
+        self.start_row_spin.setRange(1, 1000)
+        # 1=自动探测（推荐）；>1时按指定行作为起始扫描点
+        self.start_row_spin.setValue(1)
+        self.start_row_spin.setToolTip("1=自动探测；>1从该行起扫描(1基)")
+        ym_top.addWidget(QLabel("数据起始行"))
+        ym_top.addWidget(self.start_row_spin)
         ym_top.addStretch(1)
 
         grid_box = QGroupBox("选择休息日（当月1-31日）")
@@ -116,6 +125,8 @@ class MainWindow(QMainWindow):
 
         self.status = QStatusBar(self)
         self.setStatusBar(self.status)
+        # 初始化到当前年月
+        self._init_current_month()
 
     # ============ 便捷方法 ============
     def get_selected_files(self) -> List[str]:
@@ -131,3 +142,28 @@ class MainWindow(QMainWindow):
             it = QListWidgetItem(f)
             self.list_files.addItem(it)
 
+    # ============ 日期逻辑 ============
+    def _update_day_enables(self) -> None:
+        """根据当前年月启用/禁用超过当月天数的勾选框。"""
+        y = self.year_spin.value()
+        m = self.month_spin.value()
+        md = month_days(y, m)
+        for i, cb in enumerate(self.day_checks, start=1):
+            enable = i <= md
+            cb.setEnabled(enable)
+            if not enable:
+                cb.setChecked(False)
+
+    def _init_current_month(self) -> None:
+        """将年份与月份跳转到当前年月。"""
+        today = date.today()
+        self.year_spin.setValue(today.year)
+        self.month_spin.setValue(today.month)
+        self._update_day_enables()
+
+        # 当年月发生变化时，自动更新天数可用性
+        self.year_spin.valueChanged.connect(lambda _v: self._update_day_enables())
+        self.month_spin.valueChanged.connect(lambda _v: self._update_day_enables())
+
+        # 启动时初始化一次
+        self._update_day_enables()

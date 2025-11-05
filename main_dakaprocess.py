@@ -16,7 +16,7 @@ from typing import List
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from app.ui_main import MainWindow
-from app.processor import parse_excel_files, aggregate_daily, month_days
+from app.processor import parse_excel_files, aggregate_daily, month_days, parse_all_names
 from app.exporter import export_to_excel, export_summary_csv_bom
 
 
@@ -97,19 +97,33 @@ def main() -> None:
             return
         y = w.year_spin.value()
         m = w.month_spin.value()
+        # 自动探测：当值<=1时，传递None以全表扫描
+        start_1 = w.start_row_spin.value()
+        start_0 = None if start_1 <= 1 else max(0, start_1 - 1)
         rest_days: List[int] = [i + 1 for i, cb in enumerate(w.day_checks) if cb.isChecked()]
 
         w.status.showMessage("解析中，请稍候...")
-        w.log.append(f"开始解析：年={y} 月={m} 休息日={rest_days}")
+        w.log.append(f"开始解析：年={y} 月={m} 数据起始行={start_1} 休息日={rest_days}")
 
-        df_long = parse_excel_files(files)
+        df_long = parse_excel_files(files, start_row=start_0)
+        names_all = parse_all_names(files, start_row=start_0)
         cache["df_long"] = df_long
         if df_long is None or df_long.empty:
-            QMessageBox.information(w, "结果", "未解析到有效记录，请检查源文件格式")
-            w.status.clearMessage()
-            return
+            # 即使没有有效记录，也可能需要导出空明细/汇总（所有人0次）
+            if names_all:
+                df_detail, df_summary, df_need_days = aggregate_daily(df_long, y, m, rest_days, names_all=names_all)
+                cache["df_detail"] = df_detail
+                cache["df_summary"] = df_summary
+                cache["df_need_days"] = df_need_days
+                w.log.append(f"未解析到有效打卡，但识别到姓名{len(names_all)}人，已按0次生成汇总。")
+                w.status.showMessage("解析完成（无有效时刻）")
+                return
+            else:
+                QMessageBox.information(w, "结果", "未解析到有效记录，请检查源文件格式")
+                w.status.clearMessage()
+                return
 
-        df_detail, df_summary, df_need_days = aggregate_daily(df_long, y, m, rest_days)
+        df_detail, df_summary, df_need_days = aggregate_daily(df_long, y, m, rest_days, names_all=names_all)
         cache["df_detail"] = df_detail
         cache["df_summary"] = df_summary
         cache["df_need_days"] = df_need_days
@@ -157,4 +171,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
