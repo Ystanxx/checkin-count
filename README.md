@@ -3,12 +3,12 @@
 本项目用于解析员工打卡Excel原表（每3行为一人），支持多工作表合并、时间规范化、AM/NOON有效窗口判定、逐人逐日聚合与汇总导出（xlsx与UTF-8 BOM的csv），并提供需要打卡日的选择与口径页导出。
 
 ## 运行环境
-- Python：建议使用Anaconda虚拟环境 `C:/Users/stan/.conda/envs/use/python.exe`
-- 终端：PowerShell
+- Python：建议使用 Python 3.10+，推荐 Anaconda 虚拟环境
+- 终端：PowerShell（Windows）或其他系统终端
 - 依赖：见 `requirements.txt`
 
 ## 终端UTF-8配置（避免中文乱码）
-```
+```powershell
 pwsh.exe -NoLogo -NoProfile -Command $ErrorActionPreference='Stop';
 [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false;
 $env:PYTHONIOENCODING = 'utf-8';
@@ -17,21 +17,22 @@ $PSDefaultParameterValues['Out-File:Encoding'] = 'utf8';
 ```
 
 ## 安装依赖
-```
-"C:/Users/stan/.conda/envs/use/python.exe" -m pip install -r requirements.txt
+```bash
+# 激活您的 Python 环境后运行
+pip install -r requirements.txt
 ```
 
 ## 启动桌面程序
-```
-"C:/Users/stan/.conda/envs/use/python.exe" main_dakaprocess.py
+```bash
+python main_dakaprocess.py
 ```
 
 ## 起始行自动探测
 - 默认`数据起始行=1`表示自动探测，会从整张表中扫描`姓名→日期→时刻`模式；仅当特殊场景需要限制搜索范围时，可将其设置为>1的行号。
 
 ## 自检（无界面示例验证与导出）
-```
-"C:/Users/stan/.conda/envs/use/python.exe" selfcheck.py
+```bash
+python selfcheck.py
 ```
 
 ## 流程图（Mermaid）

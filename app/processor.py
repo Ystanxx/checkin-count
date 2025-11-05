@@ -52,16 +52,10 @@ NOON_START = time(11, 0, 0)               # NOON窗口：>= 11:00:00
 NOON_END = time(14, 4, 59)                # NOON窗口：<= 14:04:59
 
 
-def _to_int(val) -> Optional[int]:
-    """尝试将单元格值转换为整数，如果失败则返回None。"""
-    if pd.isna(val):
-        return None
-
-
 def _to_day(val) -> Optional[int]:
     """从单元格值中更鲁棒地提取日号(1..31)。
 
-    兼容：全角数字、带“日”后缀或其他非数字装饰。
+    兼容：全角数字、带"日"后缀或其他非数字装饰。
     """
     if pd.isna(val):
         return None
@@ -76,13 +70,6 @@ def _to_day(val) -> Optional[int]:
     if 1 <= d <= 31:
         return d
     return None
-    try:
-        s = str(val).strip()
-        if s == "":
-            return None
-        return int(float(s))
-    except Exception:
-        return None
 
 
 def _to_ascii_fullwidth(s: str) -> str:
