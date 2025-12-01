@@ -87,8 +87,9 @@ class MainWindow(QMainWindow):
         for d in range(1, 32):
             cb = QCheckBox(str(d))
             self.day_checks.append(cb)
-            r = (d - 1) // 8
-            c = (d - 1) % 8
+            # 改为7列布局，更符合星期习惯
+            r = (d - 1) // 7
+            c = (d - 1) % 7
             grid.addWidget(cb, r, c)
         ym_layout.addWidget(grid_box)
 

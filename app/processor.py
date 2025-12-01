@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime, date, time
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Callable
 
 import numpy as np
 import pandas as pd
@@ -47,9 +48,9 @@ class DailyRecord:
 # ==============================
 
 # 时间窗口边界（常量）
-AM_CUTOFF = time(9, 4, 59)               # AM窗口：<= 09:04:59
+AM_CUTOFF = time(9, 11, 59)               # AM窗口：<= 09:11:59
 NOON_START = time(11, 0, 0)               # NOON窗口：>= 11:00:00
-NOON_END = time(14, 4, 59)                # NOON窗口：<= 14:04:59
+NOON_END = time(14, 11, 59)                # NOON窗口：<= 14:11:59
 
 
 def _to_day(val) -> Optional[int]:
@@ -315,7 +316,7 @@ def _parse_person_block(sheet_df: pd.DataFrame, start_row: int) -> Tuple[Optiona
     return {"name": name, "day_to_tokens": day_to_tokens}, cur
 
 
-def parse_excel_files(file_paths: List[str], start_row: Optional[int] = None) -> pd.DataFrame:
+def parse_excel_files(file_paths: List[str], start_row: Optional[int] = None, log_callback: Optional[Callable[[str], None]] = None) -> pd.DataFrame:
     """读取多个Excel文件并解析成长表结构。
 
     返回DataFrame列：['姓名','日','时间','窗口','源文件','工作表']
@@ -324,6 +325,8 @@ def parse_excel_files(file_paths: List[str], start_row: Optional[int] = None) ->
     records: List[Tuple[str, int, str, str, str, str]] = []
 
     for f in file_paths:
+        if log_callback:
+            log_callback(f"正在处理文件: {os.path.basename(f)}")
         try:
             # 按扩展名选择引擎，增强对.xls的兼容；.xlsx显式使用openpyxl
             lower = f.lower()
@@ -333,13 +336,17 @@ def parse_excel_files(file_paths: List[str], start_row: Optional[int] = None) ->
             elif lower.endswith(".xlsx") or lower.endswith(".xlsm"):
                 engine = "openpyxl"
             xls = pd.ExcelFile(f, engine=engine)
-        except Exception:
+        except Exception as e:
+            if log_callback:
+                log_callback(f"错误：无法打开文件 {os.path.basename(f)} - {e}")
             continue
 
         for sheet_name in xls.sheet_names:
             try:
                 df = pd.read_excel(f, sheet_name=sheet_name, header=None, dtype=object, engine=engine)
-            except Exception:
+            except Exception as e:
+                if log_callback:
+                    log_callback(f"警告：无法读取工作表 {sheet_name} - {e}")
                 continue
 
             # 自动探测：若start_row为None，则从0开始全表扫描

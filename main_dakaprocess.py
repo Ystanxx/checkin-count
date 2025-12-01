@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import os
 from datetime import date, timedelta
-from typing import List
+from typing import List, Optional
 
+from PySide6.QtCore import QThread, Signal, QObject
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from app.ui_main import MainWindow
@@ -28,6 +29,48 @@ def _pick_files() -> List[str]:
     if dlg.exec():
         return dlg.selectedFiles()
     return []
+
+
+class ParseWorker(QThread):
+    """后台解析线程，避免阻塞UI。"""
+    progress_sig = Signal(str)
+    finished_sig = Signal(object, object, object, object)  # df_long, df_detail, df_summary, df_need_days
+    error_sig = Signal(str)
+
+    def __init__(self, files: List[str], start_row: Optional[int], year: int, month: int, rest_days: List[int]):
+        super().__init__()
+        self.files = files
+        self.start_row = start_0 = start_row
+        self.year = year
+        self.month = month
+        self.rest_days = rest_days
+
+    def run(self):
+        try:
+            # 定义回调函数，通过信号发送日志
+            def log_callback(msg: str):
+                self.progress_sig.emit(msg)
+
+            self.progress_sig.emit(f"开始解析：年={self.year} 月={self.month} 数据起始行={self.start_row} 休息日={self.rest_days}")
+            
+            df_long = parse_excel_files(self.files, start_row=self.start_row, log_callback=log_callback)
+            names_all = parse_all_names(self.files, start_row=self.start_row)
+            
+            if df_long is None or df_long.empty:
+                if names_all:
+                    df_detail, df_summary, df_need_days = aggregate_daily(df_long, self.year, self.month, self.rest_days, names_all=names_all)
+                    self.progress_sig.emit(f"未解析到有效打卡，但识别到姓名{len(names_all)}人，已按0次生成汇总。")
+                    self.finished_sig.emit(df_long, df_detail, df_summary, df_need_days)
+                else:
+                    self.error_sig.emit("未解析到有效记录，请检查源文件格式")
+                return
+
+            df_detail, df_summary, df_need_days = aggregate_daily(df_long, self.year, self.month, self.rest_days, names_all=names_all)
+            self.progress_sig.emit(f"解析完成：记录数={len(df_long)} 人数={df_summary.shape[0]}")
+            self.finished_sig.emit(df_long, df_detail, df_summary, df_need_days)
+
+        except Exception as e:
+            self.error_sig.emit(f"解析过程发生错误: {str(e)}")
 
 
 def main() -> None:
@@ -88,6 +131,9 @@ def main() -> None:
         "df_summary": None,
         "df_need_days": None,
     }
+    
+    # 保存 worker 引用防止被垃圾回收
+    w.worker = None
 
     # 绑定：读取并解析
     def on_parse():
@@ -95,6 +141,11 @@ def main() -> None:
         if not files:
             QMessageBox.warning(w, "提示", "请先添加Excel文件")
             return
+        
+        # 禁用按钮防止重复点击
+        w.btn_parse.setEnabled(False)
+        w.status.showMessage("解析中，请稍候...")
+        
         y = w.year_spin.value()
         m = w.month_spin.value()
         # 自动探测：当值<=1时，传递None以全表扫描
@@ -102,34 +153,29 @@ def main() -> None:
         start_0 = None if start_1 <= 1 else max(0, start_1 - 1)
         rest_days: List[int] = [i + 1 for i, cb in enumerate(w.day_checks) if cb.isChecked()]
 
-        w.status.showMessage("解析中，请稍候...")
-        w.log.append(f"开始解析：年={y} 月={m} 数据起始行={start_1} 休息日={rest_days}")
+        # 创建并启动线程
+        w.worker = ParseWorker(files, start_0, y, m, rest_days)
+        
+        def on_progress(msg):
+            w.log.append(msg)
+            
+        def on_finished(df_long, df_detail, df_summary, df_need_days):
+            cache["df_long"] = df_long
+            cache["df_detail"] = df_detail
+            cache["df_summary"] = df_summary
+            cache["df_need_days"] = df_need_days
+            w.status.showMessage("解析完成")
+            w.btn_parse.setEnabled(True)
+            
+        def on_error(msg):
+            QMessageBox.critical(w, "错误", msg)
+            w.status.clearMessage()
+            w.btn_parse.setEnabled(True)
 
-        df_long = parse_excel_files(files, start_row=start_0)
-        names_all = parse_all_names(files, start_row=start_0)
-        cache["df_long"] = df_long
-        if df_long is None or df_long.empty:
-            # 即使没有有效记录，也可能需要导出空明细/汇总（所有人0次）
-            if names_all:
-                df_detail, df_summary, df_need_days = aggregate_daily(df_long, y, m, rest_days, names_all=names_all)
-                cache["df_detail"] = df_detail
-                cache["df_summary"] = df_summary
-                cache["df_need_days"] = df_need_days
-                w.log.append(f"未解析到有效打卡，但识别到姓名{len(names_all)}人，已按0次生成汇总。")
-                w.status.showMessage("解析完成（无有效时刻）")
-                return
-            else:
-                QMessageBox.information(w, "结果", "未解析到有效记录，请检查源文件格式")
-                w.status.clearMessage()
-                return
-
-        df_detail, df_summary, df_need_days = aggregate_daily(df_long, y, m, rest_days, names_all=names_all)
-        cache["df_detail"] = df_detail
-        cache["df_summary"] = df_summary
-        cache["df_need_days"] = df_need_days
-
-        w.log.append(f"解析完成：记录数={len(df_long)} 人数={df_summary.shape[0]}")
-        w.status.showMessage("解析完成")
+        w.worker.progress_sig.connect(on_progress)
+        w.worker.finished_sig.connect(on_finished)
+        w.worker.error_sig.connect(on_error)
+        w.worker.start()
 
     w.btn_parse.clicked.connect(on_parse)
 
