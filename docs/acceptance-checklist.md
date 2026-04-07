@@ -23,7 +23,7 @@
 - [x] `tests/fixtures/*` 已建立
 - [x] Rust 单元/集成测试文件已建立
 - [x] benchmark harness 已建立
-- [ ] 当前机器已完成 `cargo test`
+- [x] 当前机器已完成 `cargo test`
 - [ ] 当前机器已完成 `cargo bench`
 
 ## 打包与交付
@@ -31,8 +31,9 @@
 - [x] Windows release 配置已写入 `tauri.conf.json`
 - [x] 发布说明 `docs/release.md` 已生成
 - [x] 构建脚本 `scripts/build-win.ps1` 已生成
-- [ ] 当前机器已产出 `.exe` 或安装包
+- [x] 当前机器已产出 `.exe`
 
 ## 阻塞项
 
-- [ ] 本机缺少 Rust 工具链，导致编译、测试、bench、打包未能实际执行
+- [ ] `cargo bench` 尚未实际执行
+- [ ] GitHub Actions 需在本次推送后重新生成最新 `exe` 产物

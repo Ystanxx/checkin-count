@@ -163,7 +163,7 @@ fn collect_time_rows(
     date_row_idx: usize,
     column_days: &BTreeMap<usize, u32>,
 ) -> (BTreeMap<u32, Vec<String>>, Vec<usize>, usize) {
-    let separators = Regex::new(r"[\s,，;；/／\\、\-\–\—()（）]+")
+    let separators = Regex::new(r"[\s,，;；/／\\、()（）–—-]+")
         .expect("time separator regex");
     let mut day_to_tokens: BTreeMap<u32, Vec<String>> = BTreeMap::new();
     let mut consumed_rows = vec![start_row, date_row_idx];

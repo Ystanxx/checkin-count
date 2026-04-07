@@ -40,6 +40,11 @@ env/
 .tmp_*.py
 *.tmp
 *.log
+*.zip
+*.xls
+*.xlsx
+*.xlsm
+*.csv
 
 # OS
 .DS_Store
@@ -49,6 +54,8 @@ Thumbs.db
 汇总_*.xlsx
 汇总_*.csv
 示例打卡.xlsx
+codex_tauri_rust_react_attendance_tasks.csv
+logo.png
 
 # Node / Vite / Tauri / Rust
 node_modules/

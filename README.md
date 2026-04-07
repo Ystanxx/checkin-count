@@ -1,68 +1,149 @@
-# 打卡数据处理（Qt6 桌面工具）
+# 团队打卡数据处理
 
-本项目用于解析员工打卡Excel原表（每3行为一人），支持多工作表合并、时间规范化、AM/NOON有效窗口判定、逐人逐日聚合与汇总导出（xlsx与UTF-8 BOM的csv），并提供需要打卡日的选择与口径页导出。
+纯本地离线的桌面端打卡数据处理工具。
 
-## 运行环境
-- Python：建议使用 Python 3.10+，推荐 Anaconda 虚拟环境
-- 终端：PowerShell（Windows）或其他系统终端
-- 依赖：见 `requirements.txt`
+当前版本采用以下技术栈：
 
-## 终端UTF-8配置（避免中文乱码）
+- `Tauri v2`
+- `Rust`
+- `React + TypeScript`
+
+核心业务、Excel 读取、规则判断、聚合与导出全部在 `Rust` 侧完成，前端只负责界面展示与命令调度，不接入远程 API，不保留 Python 运行时。
+
+## 功能范围
+
+- 多文件、多工作表读取
+- 支持 `xls`、`xlsx`、`xlsm`
+- 更稳健的“三行一人”解析
+- AM / NOON 时间窗口配置
+- 汇总表、明细表、需要打卡日、通报名单预览
+- 按缺勤天数或缺勤次数生成通报名单
+- 支持 `AND / OR` 组合逻辑
+- 导出 `xlsx`
+- 导出带 `UTF-8 BOM` 的 `csv`
+- 默认日志脱敏，不输出完整个人数据和完整绝对路径
+
+## 默认业务口径
+
+默认窗口预设采用旧代码真实行为，不再采信旧 README 文案：
+
+- `AM = 00:00:00 ~ 09:11:59`
+- `NOON = 11:00:00 ~ 14:11:59`
+
+因此默认规则下，`14:05`计入有效 `NOON`。
+
+同时，新系统固定保证：
+
+- 已识别姓名但 `0` 打卡的人员，仍进入汇总
+- 已识别姓名但 `0` 打卡的人员，仍进入通报名单判断链路
+
+## 目录结构
+
+```text
+.
+├── docs/                文档与报告
+├── scripts/             构建脚本
+├── src/                 React + TypeScript 前端
+├── src-tauri/           Tauri 与 Rust 后端
+└── tests/               测试夹具
+```
+
+## 本地开发
+
+前置环境：
+
+- `Node.js 22+`
+- `pnpm 10+`
+- `Rust stable`
+- Windows 下建议已安装 `WebView2 Runtime`
+
+安装依赖：
+
 ```powershell
-pwsh.exe -NoLogo -NoProfile -Command $ErrorActionPreference='Stop';
-[Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false;
-$env:PYTHONIOENCODING = 'utf-8';
-$PSDefaultParameterValues['Out-File:Encoding'] = 'utf8';
-'OK: UTF-8 configured'
+pnpm install
 ```
 
-## 安装依赖
-```bash
-# 激活您的 Python 环境后运行
-pip install -r requirements.txt
+启动前端开发服务：
+
+```powershell
+pnpm dev
 ```
 
-## 启动桌面程序
-```bash
-python main_dakaprocess.py
+启动桌面开发模式：
+
+```powershell
+pnpm tauri:dev
 ```
 
-## 起始行自动探测
-- 默认`数据起始行=1`表示自动探测，会从整张表中扫描`姓名→日期→时刻`模式；仅当特殊场景需要限制搜索范围时，可将其设置为>1的行号。
+## 测试与检查
 
-## 自检（无界面示例验证与导出）
-```bash
-python selfcheck.py
+前端构建检查：
+
+```powershell
+pnpm build
 ```
 
-## 流程图（Mermaid）
-```mermaid
-graph TD
-    A[开始] --> B[分析需求]
-    B --> C[编写代码]
-    C --> D[测试验证]
-    D --> E[完成]
+Rust 测试：
+
+```powershell
+cargo test --tests
 ```
 
-## 功能摘要
-- 选择多个Excel文件，支持多工作表合并
-- 解析三行结构：
-  - 第1行：优先匹配“姓名：XXX”；否则取“姓名”右侧第一个非空格
-  - 第2行：日期1–31
-  - 第3行：对应日期的多个打卡时刻，支持空格/逗号/分号/斜杠/换行分隔
-- 时间标准化：支持 H:MM[:SS]、HH:MM[:SS]、HMM/HHMM（如0835→08:35:00）
-- 有效窗口（逐条记录）：
-  - AM：<=09:04:59
-  - NOON：11:00:00–14:04:59
-  - 同日同窗多次只计1次；每日最多2次（AM+NOON）
-- 需要打卡日：选择年份+月份，并在31个勾选框内选休息日；需要打卡日=当月天数-休息日；应打卡次数=2*需要打卡日
-- 汇总口径（核心差额法）：
-  - 打卡天数：当月需要打卡日内，打过卡的天数（任一窗命中即记1天）
-  - 打卡次数：当月有效打卡次数（去重后，最多2/日）
-  - 缺勤天数=需要打卡日-打卡天数（仅0次日）
-  - 缺勤次数=应打卡次数-打卡次数（包含只打一窗的缺1次）
-  - 缺勤具体日期：仅列0次的那些需要打卡日
-- 导出：
-  - 汇总表（xlsx + UTF-8 BOM的csv）
-  - 可选明细（含AM/NOON标记）
-  - “需要打卡日”口径页
+基准测试：
+
+```powershell
+cargo bench
+```
+
+## Windows 打包
+
+当前仓库默认只产出 `exe`，不再生成 `msi`、`nsis` 安装包。
+
+本地构建：
+
+```powershell
+pwsh -File .\scripts\build-win.ps1
+```
+
+或直接执行：
+
+```powershell
+pnpm install
+pnpm build
+pnpm tauri build --no-bundle
+```
+
+构建完成后的可执行文件位于：
+
+```text
+src-tauri/target/release/*.exe
+```
+
+## GitHub Actions
+
+仓库已配置 Windows 云端构建工作流：
+
+- 工作流文件：`/.github/workflows/windows-build.yml`
+- 产物类型：仅 `exe`
+
+下载方式：
+
+1. 打开仓库的 `Actions`
+2. 进入最新一次 `build-windows-exe`
+3. 在页面底部 `Artifacts` 下载 `team-attendance-exe-*`
+
+## 隐私与安全
+
+- 默认本地处理，不出网
+- 不启用不必要的 shell / http / 任意文件系统权限
+- 输入文件通过系统对话框选择
+- 导出路径走受控保存路径
+- 默认日志脱敏
+- 仓库不保留真实打卡样本
+
+## 关键文档
+
+- 业务规则：[docs/spec/business-rules.md](./docs/spec/business-rules.md)
+- 迁移报告：[docs/migration-report.md](./docs/migration-report.md)
+- 测试矩阵：[docs/test-matrix.md](./docs/test-matrix.md)
+- 发布说明：[docs/release.md](./docs/release.md)

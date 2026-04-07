@@ -7,7 +7,7 @@
 1. `T001` 已完成
    - 输出 `docs/spec/business-rules.md`
    - 输出 `docs/spec/legacy-gap.md`
-   - 输出 `docs/README_REWRITE.md`
+   - 关键迁移说明已并入根目录 `README.md`
 2. `T002` 已完成代码落地
    - 已创建 `package.json`、`vite.config.ts`
    - 已创建 `src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`
@@ -80,15 +80,9 @@
 
 ## 5. 剩余风险
 
-1. **当前机器缺少 Rust 工具链**
-   - `cargo` 不可用
-   - `rustup` 不可用
-2. 因此当前无法实际执行：
-   - `cargo test`
-   - `cargo bench`
-   - `pnpm tauri:build`
-3. 旧 Python 自检环境缺少 `openpyxl`，无法再以旧脚本做对照运行
-4. Windows 图标尚未补齐 `.ico` 资源，当前仍以现有 `logo.png` 为主资源基础
+1. `cargo bench` 仍未实际执行，性能数值需要后补
+2. GitHub Actions 需要等待本次推送后重新生成最新 `exe` 产物
+3. 目标机器若缺少 `WebView2 Runtime` 或 `Visual C++ Runtime`，仍可能影响运行
 
 ## 6. 本地运行方式
 
@@ -132,6 +126,8 @@ pnpm build
 pnpm tauri:build
 ```
 
+当前默认仅产出 `exe`，不再生成 `msi`、`nsis` 安装包。
+
 ## 8. 测试结果
 
 ### 已落地
@@ -146,8 +142,13 @@ pnpm tauri:build
 ### 当前执行结果
 
 - 测试代码：已生成
-- 实际执行：**未执行**
-- 原因：当前机器缺少 Rust 工具链
+- 实际执行：**已执行**
+- 结果：全部通过
+  - `aggregator`：2/2
+  - `block_detector`：2/2
+  - `export`：1/1
+  - `notice_filter`：1/1
+  - `time_rules`：2/2
 
 ## 9. benchmark 结果
 
@@ -177,4 +178,4 @@ pnpm tauri:build
 
 全部落到当前工作区。
 
-当前唯一未闭环项是**本机环境缺少 Rust 工具链**，导致无法在本轮内完成编译、测试、bench 和安装包实测验证。
+当前已完成本地前端构建、Rust 测试与 Windows release `exe` 构建；剩余未闭环项主要是 benchmark 实测数据与本次推送后的 GitHub Actions 重新产物验证。

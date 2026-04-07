@@ -15,5 +15,5 @@ if (-not $SkipInstall) {
 Write-Host "[3/4] 运行前端构建"
 pnpm build
 
-Write-Host "[4/4] 运行 Tauri Windows Release 构建"
+Write-Host "[4/4] 运行 Tauri Windows Release EXE 构建"
 pnpm tauri:build

@@ -11,9 +11,7 @@
 ## Windows Release 配置
 
 1. Tauri 配置文件：`src-tauri/tauri.conf.json`
-2. bundle 目标：
-   - `nsis`
-   - `msi`
+2. 当前默认仅产出 `exe`
 3. Release 构建应使用：
 
 ```powershell
@@ -42,9 +40,9 @@ pnpm tauri:build
 
 1. 升级前备份旧导出目录
 2. 新旧版本不要共用临时目录
-3. 如需回滚，保留上一版安装包或便携版 `.exe`
+3. 如需回滚，保留上一版 `.exe`
 
 ## 已知限制
 
-1. 当前仓库已落地 release 配置，但当前机器缺少 Rust 工具链，尚未实际完成 release 构建验证
-2. 图标仍沿用现有 `logo.png` 资源，建议后续补齐 Windows `.ico`
+1. 目标机器若缺少 `WebView2 Runtime`，桌面应用将无法正常启动
+2. 目标机器若缺少 `Visual C++ Runtime`，可能需要补装运行库
