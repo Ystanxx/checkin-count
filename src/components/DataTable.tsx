@@ -9,7 +9,7 @@ interface ColumnDefinition {
 interface DataTableProps {
   title: string;
   columns: ColumnDefinition[];
-  rows: Array<Record<string, unknown>>;
+  rows: object[];
 }
 
 export function DataTable({ title, columns, rows }: DataTableProps) {
@@ -47,7 +47,7 @@ export function DataTable({ title, columns, rows }: DataTableProps) {
               currentRows.map((row, index) => (
                 <tr key={`${title}-${pagination.start + index}`}>
                   {columns.map((column) => (
-                    <td key={column.key}>{formatValue(row[column.key])}</td>
+                    <td key={column.key}>{formatValue(readCellValue(row, column.key))}</td>
                   ))}
                 </tr>
               ))
@@ -61,6 +61,10 @@ export function DataTable({ title, columns, rows }: DataTableProps) {
       </div>
     </div>
   );
+}
+
+function readCellValue(row: object, key: string) {
+  return (row as Record<string, unknown>)[key];
 }
 
 function formatValue(value: unknown) {

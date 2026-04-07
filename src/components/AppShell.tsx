@@ -19,7 +19,7 @@ export function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    let cleanup = () => undefined;
+    let cleanup: (() => void) | undefined;
     void subscribeProgress((payload) => {
       setProgress(payload.message, payload.percent);
       appendLog("info", `${payload.stage}: ${payload.message}`);
@@ -27,7 +27,7 @@ export function AppShell() {
       cleanup = unlisten;
     });
     return () => {
-      cleanup();
+      cleanup?.();
     };
   }, [appendLog, setProgress]);
 
