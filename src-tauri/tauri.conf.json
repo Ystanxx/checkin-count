@@ -38,7 +38,10 @@
     "windows": {
       "digestAlgorithm": "sha256",
       "allowDowngrades": false,
-      "tsp": false
+      "tsp": false,
+      "wix": {
+        "language": "zh-CN"
+      }
     },
     "shortDescription": "本地离线的团队打卡数据处理工具",
     "category": "Productivity"

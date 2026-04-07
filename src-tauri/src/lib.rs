@@ -15,13 +15,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(state::AppState::default())
         .invoke_handler(tauri::generate_handler![
-            commands::select_input_files,
-            commands::parse_attendance_preview,
-            commands::build_summary,
-            commands::build_notice_list,
-            commands::export_summary_xlsx,
-            commands::export_summary_csv,
-            commands::export_notice_list
+            commands::files::select_input_files,
+            commands::preview::parse_attendance_preview,
+            commands::preview::build_summary,
+            commands::preview::build_notice_list,
+            commands::export::export_summary_xlsx,
+            commands::export::export_summary_csv,
+            commands::export::export_notice_list
         ])
         .setup(|app| {
             let _ = app.emit("task://ready", serde_json::json!({ "ready": true }));
