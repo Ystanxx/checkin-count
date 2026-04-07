@@ -1,0 +1,36 @@
+[package]
+name = "attendance_tauri"
+version = "0.1.0"
+edition = "2021"
+description = "团队打卡数据处理桌面应用"
+
+[lib]
+name = "attendance_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+calamine = "0.26.1"
+chrono = { version = "0.4.39", features = ["serde"] }
+csv = "1.3.1"
+once_cell = "1.20.2"
+regex = "1.11.1"
+rust_xlsxwriter = "0.79.4"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+tauri = { version = "2.2.0", features = [] }
+tauri-plugin-dialog = "2.2.0"
+thiserror = "2.0.9"
+tokio = { version = "1.42.0", features = ["sync"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["fmt", "env-filter"] }
+
+[dev-dependencies]
+criterion = "0.5.1"
+tempfile = "3.15.0"
+
+[[bench]]
+name = "attendance_benchmark"
+harness = false

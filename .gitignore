@@ -50,6 +50,17 @@ Thumbs.db
 汇总_*.csv
 示例打卡.xlsx
 
+# Node / Vite / Tauri / Rust
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+*.tsbuildinfo
+.eslintcache
+coverage/
+benchmark-results/
+release/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
