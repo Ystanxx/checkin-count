@@ -19,6 +19,7 @@ pub fn run() {
             commands::preview::parse_attendance_preview,
             commands::preview::build_summary,
             commands::preview::build_notice_list,
+            commands::preview::build_notice_list_from_summary_file,
             commands::export::export_summary_xlsx,
             commands::export::export_summary_csv,
             commands::export::export_notice_list

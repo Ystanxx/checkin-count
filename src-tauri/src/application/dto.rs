@@ -62,6 +62,12 @@ pub struct BuildNoticeRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildNoticeFromSummaryFileRequest {
+    pub input_file: String,
+    pub rules: NoticeRulesDto,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportSummaryRequest {
     pub output_path: String,
     pub include_detail: bool,

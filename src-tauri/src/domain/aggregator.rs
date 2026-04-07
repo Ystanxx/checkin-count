@@ -1,7 +1,8 @@
 use crate::domain::attendance_schema::{
-    AggregateOutput, AttendanceDetailRow, AttendanceSummaryRow, AttendanceWindow,
-    NeedPunchDayRow, NormalizedAttendanceRecord,
+    AggregateOutput, AttendanceDetailRow, AttendanceSummaryRow, AttendanceWindow, NeedPunchDayRow,
+    NormalizedAttendanceRecord,
 };
+use crate::domain::block_detector::is_reserved_person_name;
 use crate::domain::error::DomainError;
 use crate::domain::model::{unique_sorted_times, DailyWindowRecord};
 use crate::domain::rules::AttendanceRules;
@@ -31,12 +32,14 @@ pub fn aggregate_records(
 
     let mut names = BTreeSet::new();
     for name in recognized_names {
-        if !name.trim().is_empty() {
+        if !name.trim().is_empty() && !is_reserved_person_name(name) {
             names.insert(name.trim().to_string());
         }
     }
     for record in records {
-        names.insert(record.person_name.clone());
+        if !is_reserved_person_name(&record.person_name) {
+            names.insert(record.person_name.clone());
+        }
     }
 
     let need_day_set: BTreeSet<u32> = need_days.iter().copied().collect();

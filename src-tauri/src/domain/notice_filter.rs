@@ -1,10 +1,18 @@
 use crate::domain::attendance_schema::{AttendanceSummaryRow, NoticeRow};
+use crate::domain::block_detector::is_reserved_person_name;
 use crate::domain::rules::{LogicalOperator, NoticeRules};
 
-pub fn build_notice_rows(summary_rows: &[AttendanceSummaryRow], rules: &NoticeRules) -> Vec<NoticeRow> {
+pub fn build_notice_rows(
+    summary_rows: &[AttendanceSummaryRow],
+    rules: &NoticeRules,
+) -> Vec<NoticeRow> {
     let mut notices = Vec::new();
 
     for row in summary_rows {
+        if is_reserved_person_name(&row.name) {
+            continue;
+        }
+
         let by_days = rules
             .absent_days_threshold
             .map(|threshold| row.absent_days > threshold)

@@ -1,6 +1,6 @@
 use crate::application::dto::{
-    AttendanceRulesDto, ParsePreviewRequest, PreviewBlock, PreviewResponse, ProcessStats,
-    SummaryBuildRequest, TaskProgressEvent, WorksheetPreview, BuildSummaryResponse,
+    AttendanceRulesDto, BuildSummaryResponse, ParsePreviewRequest, PreviewBlock, PreviewResponse,
+    ProcessStats, SummaryBuildRequest, TaskProgressEvent, WorksheetPreview,
 };
 use crate::domain::aggregator::aggregate_records;
 use crate::domain::attendance_schema::{NormalizedAttendanceRecord, PersonBlock};
@@ -11,6 +11,9 @@ use crate::domain::time_normalizer::normalize_time_token;
 use crate::domain::window_classifier::classify_window;
 use crate::error::{AppError, AppResult};
 use crate::infrastructure::excel_reader::read_workbooks;
+use crate::infrastructure::exported_workbook_detector::{
+    detect_exported_workbook, ExportedSheetKind,
+};
 use crate::infrastructure::security::validate_input_paths;
 use std::collections::BTreeSet;
 
@@ -24,6 +27,7 @@ pub fn parse_preview(
     if read_result.worksheets.is_empty() {
         return Err(AppError::Validation("未读取到任何可用工作表。".to_string()));
     }
+    ensure_no_exported_workbooks(&read_result.worksheets)?;
 
     reporter(progress_event("preview", 40, "扫描人员姓名与人员块"));
     let recognized_names = collect_all_names(&read_result.worksheets);
@@ -84,6 +88,7 @@ pub fn build_summary(
     if read_result.worksheets.is_empty() {
         return Err(AppError::Validation("未读取到任何可用工作表。".to_string()));
     }
+    ensure_no_exported_workbooks(&read_result.worksheets)?;
 
     reporter(progress_event("summary", 20, "构建规则与姓名全集"));
     let attendance_rules = build_attendance_rules(&request.rules)?;
@@ -136,10 +141,12 @@ fn build_attendance_rules(dto: &AttendanceRulesDto) -> AppResult<AttendanceRules
         .ok_or_else(|| AppError::Domain(DomainError::InvalidRule("AM 开始时间非法".to_string())))?;
     let am_end = normalize_time_token(&dto.am_end)
         .ok_or_else(|| AppError::Domain(DomainError::InvalidRule("AM 结束时间非法".to_string())))?;
-    let noon_start = normalize_time_token(&dto.noon_start)
-        .ok_or_else(|| AppError::Domain(DomainError::InvalidRule("NOON 开始时间非法".to_string())))?;
-    let noon_end = normalize_time_token(&dto.noon_end)
-        .ok_or_else(|| AppError::Domain(DomainError::InvalidRule("NOON 结束时间非法".to_string())))?;
+    let noon_start = normalize_time_token(&dto.noon_start).ok_or_else(|| {
+        AppError::Domain(DomainError::InvalidRule("NOON 开始时间非法".to_string()))
+    })?;
+    let noon_end = normalize_time_token(&dto.noon_end).ok_or_else(|| {
+        AppError::Domain(DomainError::InvalidRule("NOON 结束时间非法".to_string()))
+    })?;
 
     if am_start > am_end {
         return Err(AppError::Domain(DomainError::InvalidRule(
@@ -211,3 +218,19 @@ fn progress_event(stage: &str, percent: u8, message: &str) -> TaskProgressEvent 
     }
 }
 
+fn ensure_no_exported_workbooks(
+    worksheets: &[crate::domain::attendance_schema::WorksheetData],
+) -> AppResult<()> {
+    if let Some(kind) = detect_exported_workbook(worksheets) {
+        return Err(AppError::Validation(exported_workbook_message(kind)));
+    }
+
+    Ok(())
+}
+
+fn exported_workbook_message(kind: ExportedSheetKind) -> String {
+    format!(
+        "检测到工作表“{}”是程序导出的汇总/明细文件，不是原始刷卡记录。请重新选择原始刷卡 Excel。若需要从汇总文件生成通报名单，请走专用汇总导入逻辑。",
+        kind.display_name()
+    )
+}

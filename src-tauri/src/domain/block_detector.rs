@@ -1,7 +1,21 @@
 use crate::domain::attendance_schema::{BlockProvenance, PersonBlock, WorksheetData};
+use crate::domain::time_normalizer::normalize_time_token;
 use crate::domain::time_normalizer::to_ascii_fullwidth;
+use crate::infrastructure::exported_workbook_detector::is_export_header_term;
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NameEvidence {
+    Inline,
+    LabelPair,
+}
+
+#[derive(Debug, Clone)]
+struct NameCandidate {
+    value: String,
+    evidence: NameEvidence,
+}
 
 pub fn collect_all_names(worksheets: &[WorksheetData]) -> Vec<String> {
     let mut seen = BTreeSet::new();
@@ -20,7 +34,10 @@ pub fn collect_all_names(worksheets: &[WorksheetData]) -> Vec<String> {
     names
 }
 
-pub fn parse_person_blocks(worksheet: &WorksheetData, start_row: Option<usize>) -> Vec<PersonBlock> {
+pub fn parse_person_blocks(
+    worksheet: &WorksheetData,
+    start_row: Option<usize>,
+) -> Vec<PersonBlock> {
     let mut blocks = Vec::new();
     let mut cursor = start_row.unwrap_or(0);
 
@@ -40,14 +57,26 @@ pub fn parse_person_blocks(worksheet: &WorksheetData, start_row: Option<usize>) 
 }
 
 fn parse_person_block(worksheet: &WorksheetData, start_row: usize) -> Option<(PersonBlock, usize)> {
-    let name = extract_name_from_row(worksheet.rows.get(start_row)?)?;
+    let name_candidate = extract_name_candidate(worksheet.rows.get(start_row)?)?;
+    if looks_like_export_header_row(worksheet.rows.get(start_row)?) {
+        return None;
+    }
+
     let (date_row_idx, column_days) = detect_best_date_row(worksheet, start_row)?;
     let (day_to_tokens, consumed_rows, end_row) =
         collect_time_rows(worksheet, start_row, date_row_idx, &column_days);
+    let legal_time_token_count = count_legal_time_tokens(&day_to_tokens);
+
+    if legal_time_token_count == 0
+        && (name_candidate.evidence == NameEvidence::LabelPair
+            || looks_like_export_structure(worksheet, start_row, end_row))
+    {
+        return None;
+    }
 
     Some((
         PersonBlock {
-            name,
+            name: name_candidate.value,
             day_to_tokens,
             provenance: BlockProvenance {
                 file_name: worksheet.source.file_name.clone(),
@@ -63,6 +92,10 @@ fn parse_person_block(worksheet: &WorksheetData, start_row: usize) -> Option<(Pe
 }
 
 fn extract_name_from_row(row: &[String]) -> Option<String> {
+    extract_name_candidate(row).map(|candidate| candidate.value)
+}
+
+fn extract_name_candidate(row: &[String]) -> Option<NameCandidate> {
     let inline_pattern = Regex::new(r"姓\s*名\s*[：:]\s*([^\s:：\-\|]+)").expect("name regex");
 
     for cell in row {
@@ -72,8 +105,11 @@ fn extract_name_from_row(row: &[String]) -> Option<String> {
         }
         if let Some(capture) = inline_pattern.captures(&value) {
             let name = capture.get(1)?.as_str().trim().to_string();
-            if !name.is_empty() {
-                return Some(name);
+            if looks_like_person_name(&name) {
+                return Some(NameCandidate {
+                    value: name,
+                    evidence: NameEvidence::Inline,
+                });
             }
         }
     }
@@ -86,8 +122,11 @@ fn extract_name_from_row(row: &[String]) -> Option<String> {
         if value == "姓名" {
             for candidate in row.iter().skip(index + 1) {
                 let trimmed = candidate.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
+                if looks_like_person_name(trimmed) {
+                    return Some(NameCandidate {
+                        value: trimmed.to_string(),
+                        evidence: NameEvidence::LabelPair,
+                    });
                 }
             }
         }
@@ -101,6 +140,8 @@ fn detect_best_date_row(
     name_row: usize,
 ) -> Option<(usize, BTreeMap<usize, u32>)> {
     let mut best_row: Option<(usize, BTreeMap<usize, u32>, i32)> = None;
+    let strong_name_evidence =
+        extract_name_candidate(worksheet.rows.get(name_row)?)?.evidence == NameEvidence::Inline;
 
     for offset in 1..=4 {
         let row_idx = name_row + offset;
@@ -112,10 +153,16 @@ fn detect_best_date_row(
             continue;
         }
 
+        let nearby_time_token_count = count_nearby_legal_time_tokens(worksheet, row_idx, &map);
+        if nearby_time_token_count == 0 && !strong_name_evidence {
+            continue;
+        }
+
         let unique_days = map.values().copied().collect::<BTreeSet<u32>>().len() as i32;
         let duplicate_penalty = map.len() as i32 - unique_days;
         let proximity_bonus = 5 - offset as i32;
-        let score = unique_days * 10 + proximity_bonus - duplicate_penalty * 2;
+        let time_bonus = nearby_time_token_count.min(6) as i32 * 4;
+        let score = unique_days * 10 + proximity_bonus + time_bonus - duplicate_penalty * 2;
 
         match &best_row {
             Some((_, _, current_score)) if *current_score >= score => {}
@@ -136,6 +183,35 @@ fn parse_date_columns(row: &[String]) -> BTreeMap<usize, u32> {
     }
 
     result
+}
+
+pub fn is_reserved_person_name(name: &str) -> bool {
+    let normalized = normalize_name(name);
+    normalized.is_empty() || is_export_header_term(&normalized)
+}
+
+fn looks_like_person_name(name: &str) -> bool {
+    let normalized = normalize_name(name);
+    if normalized.is_empty() || is_reserved_person_name(&normalized) {
+        return false;
+    }
+    if normalized.chars().count() > 20 {
+        return false;
+    }
+
+    normalized.chars().all(|ch| {
+        ch.is_ascii_alphabetic()
+            || ch.is_ascii_whitespace()
+            || matches!(ch, '·' | '•' | '.')
+            || ('\u{4e00}'..='\u{9fff}').contains(&ch)
+    })
+}
+
+fn normalize_name(value: &str) -> String {
+    to_ascii_fullwidth(value)
+        .replace(['：', ':'], "")
+        .trim()
+        .to_string()
 }
 
 pub fn parse_day(input: &str) -> Option<u32> {
@@ -163,8 +239,7 @@ fn collect_time_rows(
     date_row_idx: usize,
     column_days: &BTreeMap<usize, u32>,
 ) -> (BTreeMap<u32, Vec<String>>, Vec<usize>, usize) {
-    let separators = Regex::new(r"[\s,，;；/／\\、()（）–—-]+")
-        .expect("time separator regex");
+    let separators = Regex::new(r"[\s,，;；/／\\、()（）–—-]+").expect("time separator regex");
     let mut day_to_tokens: BTreeMap<u32, Vec<String>> = BTreeMap::new();
     let mut consumed_rows = vec![start_row, date_row_idx];
     let mut end_row = date_row_idx;
@@ -217,6 +292,52 @@ fn collect_time_rows(
     }
 
     (day_to_tokens, consumed_rows, end_row)
+}
+
+fn count_nearby_legal_time_tokens(
+    worksheet: &WorksheetData,
+    date_row_idx: usize,
+    column_days: &BTreeMap<usize, u32>,
+) -> usize {
+    let (day_to_tokens, _, _) = collect_time_rows(
+        worksheet,
+        date_row_idx.saturating_sub(1),
+        date_row_idx,
+        column_days,
+    );
+    count_legal_time_tokens(&day_to_tokens)
+}
+
+fn count_legal_time_tokens(day_to_tokens: &BTreeMap<u32, Vec<String>>) -> usize {
+    day_to_tokens
+        .values()
+        .flat_map(|tokens| tokens.iter())
+        .filter(|token| normalize_time_token(token).is_some())
+        .count()
+}
+
+fn looks_like_export_structure(
+    worksheet: &WorksheetData,
+    start_row: usize,
+    end_row: usize,
+) -> bool {
+    worksheet.rows[start_row..=end_row]
+        .iter()
+        .any(|row| looks_like_export_header_row(row))
+}
+
+fn looks_like_export_header_row(row: &[String]) -> bool {
+    let normalized = row
+        .iter()
+        .map(|cell| normalize_name(cell))
+        .filter(|cell| !cell.is_empty())
+        .collect::<Vec<_>>();
+
+    normalized
+        .iter()
+        .filter(|cell| is_export_header_term(cell))
+        .count()
+        >= 2
 }
 
 fn expand_date_columns(

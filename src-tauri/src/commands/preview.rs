@@ -1,6 +1,7 @@
 use crate::application::app_service;
 use crate::application::dto::{
-    BuildNoticeRequest, ParsePreviewRequest, SummaryBuildRequest, TaskProgressEvent,
+    BuildNoticeFromSummaryFileRequest, BuildNoticeRequest, ParsePreviewRequest,
+    SummaryBuildRequest, TaskProgressEvent,
 };
 use crate::application::notice_service;
 use crate::error::UserVisibleError;
@@ -64,10 +65,12 @@ pub async fn build_notice_list(
     request: BuildNoticeRequest,
 ) -> Result<crate::application::dto::NoticeBuildResponse, UserVisibleError> {
     let app_state = state.inner().clone();
-    let summary = app_state.read(|runtime| runtime.summary.clone()).ok_or(UserVisibleError {
-        code: "STATE_ERROR".to_string(),
-        message: "请先生成汇总结果。".to_string(),
-    })?;
+    let summary = app_state
+        .read(|runtime| runtime.summary.clone())
+        .ok_or(UserVisibleError {
+            code: "STATE_ERROR".to_string(),
+            message: "请先生成汇总结果。".to_string(),
+        })?;
 
     let response = tauri::async_runtime::spawn_blocking(move || {
         notice_service::build_notice_list(&summary.summary_rows, request)
@@ -84,6 +87,30 @@ pub async fn build_notice_list(
         if let Some(summary) = runtime.summary.as_mut() {
             summary.notice_rows = response.notice_rows.clone();
         }
+    });
+
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn build_notice_list_from_summary_file(
+    state: State<'_, AppState>,
+    request: BuildNoticeFromSummaryFileRequest,
+) -> Result<crate::application::dto::NoticeBuildResponse, UserVisibleError> {
+    let app_state = state.inner().clone();
+    let response = tauri::async_runtime::spawn_blocking(move || {
+        notice_service::build_notice_list_from_summary_file(request)
+    })
+    .await
+    .map_err(|error| UserVisibleError {
+        code: "TASK_JOIN_ERROR".to_string(),
+        message: format!("通报名单任务执行失败: {error}"),
+    })
+    .and_then(|result| result.map_err(|error| error.to_user_visible()))?;
+
+    app_state.write(|runtime| {
+        runtime.notice = Some(response.clone());
+        runtime.summary = None;
     });
 
     Ok(response)
