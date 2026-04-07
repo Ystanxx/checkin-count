@@ -22,12 +22,16 @@ impl ExportCsvError {
     }
 }
 
-pub fn export_summary_csv(output_path: &Path, rows: &[AttendanceSummaryRow]) -> Result<(), ExportCsvError> {
+pub fn export_summary_csv(
+    output_path: &Path,
+    rows: &[AttendanceSummaryRow],
+) -> Result<(), ExportCsvError> {
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).map_err(|error| ExportCsvError::CreateDir(error.to_string()))?;
     }
 
-    let mut file = File::create(output_path).map_err(|error| ExportCsvError::Write(error.to_string()))?;
+    let mut file =
+        File::create(output_path).map_err(|error| ExportCsvError::Write(error.to_string()))?;
     file.write_all(&[0xEF, 0xBB, 0xBF])
         .map_err(|error| ExportCsvError::Write(error.to_string()))?;
 
@@ -60,7 +64,9 @@ pub fn export_summary_csv(output_path: &Path, rows: &[AttendanceSummaryRow]) -> 
             .map_err(|error| ExportCsvError::Write(error.to_string()))?;
     }
 
-    writer.flush().map_err(|error| ExportCsvError::Write(error.to_string()))?;
+    writer
+        .flush()
+        .map_err(|error| ExportCsvError::Write(error.to_string()))?;
     Ok(())
 }
 
@@ -69,7 +75,8 @@ pub fn export_notice_csv(output_path: &Path, rows: &[NoticeRow]) -> Result<(), E
         fs::create_dir_all(parent).map_err(|error| ExportCsvError::CreateDir(error.to_string()))?;
     }
 
-    let mut file = File::create(output_path).map_err(|error| ExportCsvError::Write(error.to_string()))?;
+    let mut file =
+        File::create(output_path).map_err(|error| ExportCsvError::Write(error.to_string()))?;
     file.write_all(&[0xEF, 0xBB, 0xBF])
         .map_err(|error| ExportCsvError::Write(error.to_string()))?;
 
@@ -104,10 +111,15 @@ pub fn export_notice_csv(output_path: &Path, rows: &[NoticeRow]) -> Result<(), E
             .map_err(|error| ExportCsvError::Write(error.to_string()))?;
     }
 
-    writer.flush().map_err(|error| ExportCsvError::Write(error.to_string()))?;
+    writer
+        .flush()
+        .map_err(|error| ExportCsvError::Write(error.to_string()))?;
     Ok(())
 }
 
 fn join_days(days: &[u32]) -> String {
-    days.iter().map(u32::to_string).collect::<Vec<_>>().join(",")
+    days.iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }

@@ -31,7 +31,8 @@ pub fn export_summary_workbook(
     notice_rows: Option<&[NoticeRow]>,
 ) -> Result<(), ExportXlsxError> {
     if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| ExportXlsxError::CreateDir(error.to_string()))?;
+        fs::create_dir_all(parent)
+            .map_err(|error| ExportXlsxError::CreateDir(error.to_string()))?;
     }
 
     let mut workbook = Workbook::new();
@@ -50,9 +51,13 @@ pub fn export_summary_workbook(
     Ok(())
 }
 
-pub fn export_notice_workbook(output_path: &Path, notice_rows: &[NoticeRow]) -> Result<(), ExportXlsxError> {
+pub fn export_notice_workbook(
+    output_path: &Path,
+    notice_rows: &[NoticeRow],
+) -> Result<(), ExportXlsxError> {
     if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| ExportXlsxError::CreateDir(error.to_string()))?;
+        fs::create_dir_all(parent)
+            .map_err(|error| ExportXlsxError::CreateDir(error.to_string()))?;
     }
 
     let mut workbook = Workbook::new();
@@ -61,7 +66,10 @@ pub fn export_notice_workbook(output_path: &Path, notice_rows: &[NoticeRow]) -> 
     Ok(())
 }
 
-fn write_summary_sheet(workbook: &mut Workbook, rows: &[AttendanceSummaryRow]) -> Result<(), XlsxError> {
+fn write_summary_sheet(
+    workbook: &mut Workbook,
+    rows: &[AttendanceSummaryRow],
+) -> Result<(), XlsxError> {
     let worksheet = workbook.add_worksheet();
     worksheet.set_name("汇总")?;
     let headers = [
@@ -92,10 +100,22 @@ fn write_summary_sheet(workbook: &mut Workbook, rows: &[AttendanceSummaryRow]) -
     Ok(())
 }
 
-fn write_detail_sheet(workbook: &mut Workbook, rows: &[AttendanceDetailRow]) -> Result<(), XlsxError> {
+fn write_detail_sheet(
+    workbook: &mut Workbook,
+    rows: &[AttendanceDetailRow],
+) -> Result<(), XlsxError> {
     let worksheet = workbook.add_worksheet();
     worksheet.set_name("明细")?;
-    let headers = ["姓名", "日期", "日", "AM命中", "NOON命中", "当日计次", "AM时间列表", "NOON时间列表"];
+    let headers = [
+        "姓名",
+        "日期",
+        "日",
+        "AM命中",
+        "NOON命中",
+        "当日计次",
+        "AM时间列表",
+        "NOON时间列表",
+    ];
     write_headers(worksheet, &headers)?;
 
     for (row_index, row) in rows.iter().enumerate() {
@@ -114,14 +134,21 @@ fn write_detail_sheet(workbook: &mut Workbook, rows: &[AttendanceDetailRow]) -> 
     Ok(())
 }
 
-fn write_need_days_sheet(workbook: &mut Workbook, rows: &[NeedPunchDayRow]) -> Result<(), XlsxError> {
+fn write_need_days_sheet(
+    workbook: &mut Workbook,
+    rows: &[NeedPunchDayRow],
+) -> Result<(), XlsxError> {
     let worksheet = workbook.add_worksheet();
     worksheet.set_name("需要打卡日")?;
     let headers = ["年份", "月份", "需要打卡日"];
     write_headers(worksheet, &headers)?;
 
     for (row_index, row) in rows.iter().enumerate() {
-        let line = [row.year.to_string(), row.month.to_string(), row.day.to_string()];
+        let line = [
+            row.year.to_string(),
+            row.month.to_string(),
+            row.day.to_string(),
+        ];
         write_line(worksheet, row_index + 1, &line)?;
     }
     Ok(())
@@ -182,7 +209,10 @@ fn write_line(
 }
 
 fn join_days(days: &[u32]) -> String {
-    days.iter().map(u32::to_string).collect::<Vec<_>>().join(",")
+    days.iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn bool_to_cn(value: bool) -> String {

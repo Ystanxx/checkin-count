@@ -1,5 +1,7 @@
 use attendance_tauri_lib::domain::aggregator::aggregate_records;
-use attendance_tauri_lib::domain::attendance_schema::{AttendanceWindow, NormalizedAttendanceRecord};
+use attendance_tauri_lib::domain::attendance_schema::{
+    AttendanceWindow, NormalizedAttendanceRecord,
+};
 use attendance_tauri_lib::domain::rules::AttendanceRules;
 use chrono::NaiveTime;
 
@@ -23,7 +25,10 @@ fn keeps_zero_punch_people_in_summary() {
     )
     .expect("aggregate");
 
-    assert!(aggregate.summary_rows.iter().any(|row| row.name == "李四" && row.actual_punch_count == 0));
+    assert!(aggregate
+        .summary_rows
+        .iter()
+        .any(|row| row.name == "李四" && row.actual_punch_count == 0));
 }
 
 #[test]
@@ -48,8 +53,18 @@ fn deduplicates_same_day_same_window_hits() {
         },
     ];
 
-    let aggregate = aggregate_records(&records, &["张三".to_string()], 2026, 4, &AttendanceRules::default())
-        .expect("aggregate");
-    let summary = aggregate.summary_rows.iter().find(|row| row.name == "张三").expect("summary");
+    let aggregate = aggregate_records(
+        &records,
+        &["张三".to_string()],
+        2026,
+        4,
+        &AttendanceRules::default(),
+    )
+    .expect("aggregate");
+    let summary = aggregate
+        .summary_rows
+        .iter()
+        .find(|row| row.name == "张三")
+        .expect("summary");
     assert_eq!(summary.actual_punch_count, 1);
 }

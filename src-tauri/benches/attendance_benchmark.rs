@@ -1,5 +1,7 @@
 use attendance_tauri_lib::domain::aggregator::aggregate_records;
-use attendance_tauri_lib::domain::attendance_schema::{AttendanceWindow, NormalizedAttendanceRecord};
+use attendance_tauri_lib::domain::attendance_schema::{
+    AttendanceWindow, NormalizedAttendanceRecord,
+};
 use attendance_tauri_lib::domain::notice_filter::build_notice_rows;
 use attendance_tauri_lib::domain::rules::{AttendanceRules, LogicalOperator, NoticeRules};
 use chrono::NaiveTime;
@@ -18,10 +20,15 @@ fn benchmark_aggregate(c: &mut Criterion) {
             })
         })
         .collect::<Vec<_>>();
-    let names = (0..200).map(|index| format!("员工{index}")).collect::<Vec<_>>();
+    let names = (0..200)
+        .map(|index| format!("员工{index}"))
+        .collect::<Vec<_>>();
 
     c.bench_function("aggregate_records_200_people", |b| {
-        b.iter(|| aggregate_records(&records, &names, 2026, 4, &AttendanceRules::default()).expect("aggregate"));
+        b.iter(|| {
+            aggregate_records(&records, &names, 2026, 4, &AttendanceRules::default())
+                .expect("aggregate")
+        });
     });
 }
 
@@ -39,7 +46,9 @@ fn benchmark_notice(c: &mut Criterion) {
                 })
             })
             .collect::<Vec<_>>(),
-        &(0..200).map(|index| format!("员工{index}")).collect::<Vec<_>>(),
+        &(0..200)
+            .map(|index| format!("员工{index}"))
+            .collect::<Vec<_>>(),
         2026,
         4,
         &AttendanceRules::default(),

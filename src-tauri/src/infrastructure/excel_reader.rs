@@ -71,5 +71,8 @@ pub fn read_workbooks(paths: &[PathBuf]) -> Result<ReadWorkbookResult, ExcelRead
         }
     }
 
-    Ok(ReadWorkbookResult { worksheets, warnings })
+    Ok(ReadWorkbookResult {
+        worksheets,
+        warnings,
+    })
 }

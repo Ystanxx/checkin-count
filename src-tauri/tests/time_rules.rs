@@ -11,8 +11,9 @@ struct TokenFixture {
 
 #[test]
 fn normalizes_fullwidth_compact_and_fractional_times() {
-    let fixture: TokenFixture = serde_json::from_str(include_str!("../../tests/fixtures/time_tokens.json"))
-        .expect("fixture parse");
+    let fixture: TokenFixture =
+        serde_json::from_str(include_str!("../../tests/fixtures/time_tokens.json"))
+            .expect("fixture parse");
 
     let normalized = fixture
         .tokens

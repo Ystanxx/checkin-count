@@ -39,9 +39,14 @@ pub fn validate_input_paths(paths: &[String]) -> Result<Vec<PathBuf>, SecurityEr
     Ok(validated)
 }
 
-pub fn prepare_output_path(raw_path: &str, expected_extension: &str) -> Result<PathBuf, SecurityError> {
+pub fn prepare_output_path(
+    raw_path: &str,
+    expected_extension: &str,
+) -> Result<PathBuf, SecurityError> {
     let input_path = PathBuf::from(raw_path);
-    let parent = input_path.parent().ok_or(SecurityError::InvalidOutputPath)?;
+    let parent = input_path
+        .parent()
+        .ok_or(SecurityError::InvalidOutputPath)?;
     let stem = input_path
         .file_stem()
         .and_then(|value| value.to_str())
@@ -57,7 +62,9 @@ pub fn prepare_output_path(raw_path: &str, expected_extension: &str) -> Result<P
         .unwrap_or_default()
         .to_ascii_lowercase();
     if extension != expected_extension.to_ascii_lowercase() {
-        return Err(SecurityError::InvalidOutputExtension(expected_extension.to_string()));
+        return Err(SecurityError::InvalidOutputExtension(
+            expected_extension.to_string(),
+        ));
     }
 
     Ok(output_path)
@@ -74,8 +81,7 @@ pub fn sanitize_file_name(input: &str) -> String {
     let sanitized: String = input
         .chars()
         .map(|ch| {
-            if ch.is_ascii_alphanumeric()
-                || matches!(ch, '-' | '_' | '(' | ')' | '[' | ']' | ' ') {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '(' | ')' | '[' | ']' | ' ') {
                 ch
             } else if ('一'..='龥').contains(&ch) {
                 ch
