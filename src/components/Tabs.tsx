@@ -8,27 +8,22 @@ const tabs: Array<{ key: PreviewTabKey; label: string }> = [
   { key: "notice", label: "通报名单" },
 ];
 
-interface TabsProps {
-  activeTab: PreviewTabKey;
-}
-
-export function Tabs({ activeTab }: TabsProps) {
+export function Tabs() {
+  const activeTab = useAppStore((state) => state.activeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
 
   return (
-    <section className="card tabs-card">
-      <div className="tabs-row">
-        {tabs.map((tab) => (
-          <button
-            className={`tab-button ${activeTab === tab.key ? "is-active" : ""}`}
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-    </section>
+    <div className="tabs-row">
+      {tabs.map((tab) => (
+        <button
+          className={`tab-button ${activeTab === tab.key ? "is-active" : ""}`}
+          key={tab.key}
+          onClick={() => setActiveTab(tab.key)}
+          type="button"
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
   );
 }

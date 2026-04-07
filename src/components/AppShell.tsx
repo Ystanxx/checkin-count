@@ -6,30 +6,38 @@ import { PreviewPage } from "../pages/PreviewPage";
 import { ExportPage } from "../pages/ExportPage";
 import { LogPanel } from "./LogPanel";
 import { ProgressBanner } from "./ProgressBanner";
-import { Tabs } from "./Tabs";
 import { subscribeProgress } from "../utils/tauri";
 
 export function AppShell() {
-  const loading = useAppStore((state) => state.loading);
-  const logs = useAppStore((state) => state.logs);
   const preview = useAppStore((state) => state.preview);
-  const activeTab = useAppStore((state) => state.activeTab);
-  const setProgress = useAppStore((state) => state.setProgress);
-  const appendLog = useAppStore((state) => state.appendLog);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
+    let disposed = false;
     let cleanup: (() => void) | undefined;
+
     void subscribeProgress((payload) => {
-      setProgress(payload.message, payload.percent);
-      appendLog("info", `${payload.stage}: ${payload.message}`);
+      const store = useAppStore.getState();
+      const message = `${payload.stage}: ${payload.message}`;
+      const latestLog = store.logs[store.logs.length - 1];
+
+      store.setProgress(payload.message, payload.percent);
+      if (!latestLog || latestLog.message !== message) {
+        store.appendLog("info", message);
+      }
     }).then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
       cleanup = unlisten;
     });
+
     return () => {
+      disposed = true;
       cleanup?.();
     };
-  }, [appendLog, setProgress]);
+  }, []);
 
   const quickStats = useMemo(
     () => [
@@ -42,7 +50,7 @@ export function AppShell() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
       <aside className={`sidebar ${sidebarCollapsed ? "is-collapsed" : ""}`}>
         <div className="brand-block">
           <div>
@@ -71,16 +79,13 @@ export function AppShell() {
       </aside>
 
       <main className="main-panel">
-        <ProgressBanner loading={loading} />
-        <section className="page-grid">
+        <ProgressBanner />
+        <section className="workspace-grid">
           <FileSelectPage />
+          <ExportPage />
           <RulesPage />
           <PreviewPage />
-          <ExportPage />
-        </section>
-        <section className="bottom-grid">
-          <Tabs activeTab={activeTab} />
-          <LogPanel logs={logs} />
+          <LogPanel />
         </section>
       </main>
     </div>

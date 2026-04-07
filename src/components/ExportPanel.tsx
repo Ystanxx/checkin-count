@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useAppStore } from "../store/appStore";
 
 export function ExportPanel() {
-  const { year, month } = useAppStore((state) => ({ year: state.year, month: state.month }));
+  const year = useAppStore((state) => state.year);
+  const month = useAppStore((state) => state.month);
   const exportSummaryXlsx = useAppStore((state) => state.exportSummaryXlsx);
   const exportSummaryCsv = useAppStore((state) => state.exportSummaryCsv);
   const exportNotice = useAppStore((state) => state.exportNotice);
@@ -19,9 +20,10 @@ export function ExportPanel() {
   );
 
   return (
-    <section className="card span-2">
+    <section className="card workspace-export">
       <div className="card-header">
         <div>
+          <div className="panel-kicker">输出台</div>
           <h2>导出</h2>
           <p>{summaryHint}</p>
         </div>
@@ -34,27 +36,30 @@ export function ExportPanel() {
       </div>
 
       <div className="export-stack">
-        <label>
+        <label className="export-block">
           <span>汇总 xlsx 路径</span>
           <input value={summaryXlsxPath} onChange={(event) => setSummaryXlsxPath(event.target.value)} />
+          <small>适合正式汇总与留档。</small>
         </label>
         <div className="button-row">
           <button className="primary-button" onClick={() => void exportSummaryXlsx(summaryXlsxPath, includeDetail, includeNeedDays, includeNotice)} type="button">
             导出汇总 xlsx
           </button>
         </div>
-        <label>
+        <label className="export-block">
           <span>汇总 csv 路径</span>
           <input value={summaryCsvPath} onChange={(event) => setSummaryCsvPath(event.target.value)} />
+          <small>带 UTF-8 BOM，便于 Excel 直接打开。</small>
         </label>
         <div className="button-row">
           <button className="secondary-button" onClick={() => void exportSummaryCsv(summaryCsvPath, includeDetail, includeNeedDays, includeNotice)} type="button">
             导出汇总 csv
           </button>
         </div>
-        <label>
+        <label className="export-block">
           <span>通报名单路径</span>
           <input value={noticePath} onChange={(event) => setNoticePath(event.target.value)} />
+          <small>适合独立发给管理端。</small>
         </label>
         <div className="button-row">
           <button className="secondary-button" onClick={() => void exportNotice(noticePath)} type="button">

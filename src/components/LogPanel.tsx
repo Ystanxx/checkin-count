@@ -1,14 +1,13 @@
-import type { LogEntry } from "../types/attendance";
+import { useAppStore } from "../store/appStore";
 
-interface LogPanelProps {
-  logs: LogEntry[];
-}
+export function LogPanel() {
+  const logs = useAppStore((state) => state.logs);
 
-export function LogPanel({ logs }: LogPanelProps) {
   return (
-    <section className="card log-card">
+    <section className="card log-card workspace-logs">
       <div className="card-header">
         <div>
+          <div className="panel-kicker">审计轨迹</div>
           <h2>运行日志</h2>
           <p>默认日志不展示完整绝对路径与完整个人数据。</p>
         </div>

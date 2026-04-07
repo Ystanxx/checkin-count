@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useAppStore } from "../store/appStore";
 import type { PreviewTabKey } from "../types/attendance";
 import { DataTable } from "./DataTable";
+import { Tabs } from "./Tabs";
 
 export function PreviewPanel() {
   const preview = useAppStore((state) => state.preview);
@@ -13,9 +14,10 @@ export function PreviewPanel() {
   const tableModel = useMemo(() => buildTableModel(activeTab, preview), [activeTab, preview]);
 
   return (
-    <section className="card span-3">
+    <section className="card workspace-preview">
       <div className="card-header">
         <div>
+          <div className="panel-kicker">结果工作台</div>
           <h2>解析结果预览</h2>
           <p>先做解析预览，再生成汇总与通报名单。大表格默认分页渲染。</p>
         </div>
@@ -30,6 +32,29 @@ export function PreviewPanel() {
             生成通报名单
           </button>
         </div>
+      </div>
+
+      <div className="insight-strip">
+        <div className="insight-chip">
+          <span>已识别姓名</span>
+          <strong>{preview.recognizedNames.length}</strong>
+        </div>
+        <div className="insight-chip">
+          <span>工作表样本</span>
+          <strong>{preview.worksheetPreviews.length}</strong>
+        </div>
+        <div className="insight-chip">
+          <span>人员块样本</span>
+          <strong>{preview.sampleBlocks.length}</strong>
+        </div>
+        <div className="insight-chip">
+          <span>当前视图</span>
+          <strong>{tableModel.title}</strong>
+        </div>
+      </div>
+
+      <div className="tabs-shell">
+        <Tabs />
       </div>
 
       <div className="preview-top-grid">
