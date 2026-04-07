@@ -9,11 +9,19 @@ import type {
   PreviewTabKey,
 } from "../types/attendance";
 import { getCurrentYearMonth } from "../utils/date";
-import { createMockInputFiles, createMockNoticeRules, createMockPreviewData, createMockRules } from "../utils/mock";
+import {
+  createEmptyPreviewData,
+  createMockInputFiles,
+  createMockNoticeRules,
+  createMockPreviewData,
+  createMockRules,
+} from "../utils/mock";
+import { loadAppPreferences } from "../utils/preferences";
 import {
   applyNoticeResponse,
   applySummaryResponse,
   callTauriCommand,
+  isTauriAvailable,
   mapPreviewResponse,
   toInputFiles,
 } from "../utils/tauri";
@@ -45,9 +53,10 @@ interface AppActions {
   setProgress: (message: string, percent: number) => void;
   appendLog: (level: LogEntry["level"], message: string) => void;
   loadInputFiles: () => Promise<void>;
-  runPreview: () => Promise<void>;
-  runSummary: () => Promise<void>;
-  runNotice: () => Promise<void>;
+  runPreview: () => Promise<boolean>;
+  runSummary: () => Promise<boolean>;
+  runNotice: () => Promise<boolean>;
+  runPrimaryFlow: () => Promise<boolean>;
   exportSummaryXlsx: (outputPath: string, includeDetail: boolean, includeNeedDays: boolean, includeNotice: boolean) => Promise<void>;
   exportSummaryCsv: (outputPath: string, includeDetail: boolean, includeNeedDays: boolean, includeNotice: boolean) => Promise<void>;
   exportNotice: (outputPath: string) => Promise<void>;
@@ -55,16 +64,17 @@ interface AppActions {
 }
 
 const current = getCurrentYearMonth();
-const initialPreview = createMockPreviewData();
+const savedPreferences = loadAppPreferences();
+const initialPreview = createEmptyPreviewData();
 
 export const useAppStore = create<AppState & AppActions>((set, get) => ({
   inputFiles: [],
-  year: current.year,
-  month: current.month,
-  startRow: 1,
-  restDays: [],
-  rules: createMockRules(),
-  noticeRules: createMockNoticeRules(),
+  year: savedPreferences?.year ?? current.year,
+  month: savedPreferences?.month ?? current.month,
+  startRow: savedPreferences?.startRow ?? 1,
+  restDays: savedPreferences?.restDays ?? [],
+  rules: savedPreferences?.rules ?? createMockRules(),
+  noticeRules: savedPreferences?.noticeRules ?? createMockNoticeRules(),
   loading: false,
   progressMessage: "等待执行",
   progressPercent: 0,
@@ -93,8 +103,14 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       return;
     }
 
-    set({ inputFiles: createMockInputFiles(), loading: false, progressMessage: "切换到示例文件", progressPercent: 100 });
-    appendLog("warning", result.message ?? "未连接到桌面命令，已切换到示例文件。");
+    if (!isTauriAvailable()) {
+      set({ inputFiles: createMockInputFiles(), loading: false, progressMessage: "切换到示例文件", progressPercent: 100 });
+      appendLog("warning", result.message ?? "未连接到桌面命令，已切换到示例文件。");
+      return;
+    }
+
+    set({ loading: false, progressMessage: "文件选择失败", progressPercent: 100 });
+    appendLog("warning", result.message ?? "文件选择失败。");
   },
   runPreview: async () => {
     const state = get();
@@ -107,12 +123,19 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
     });
     if (result.ok && result.data) {
       set({ preview: mapPreviewResponse(result.data), loading: false, progressMessage: "解析预览完成", progressPercent: 100 });
-      state.appendLog("success", "解析预览已更新。")
-      return;
+      state.appendLog("success", "解析预览已更新。");
+      return true;
     }
 
-    set({ preview: createMockPreviewData(), loading: false, progressMessage: "切换到示例预览", progressPercent: 100 });
-    state.appendLog("warning", result.message ?? "解析预览失败，已切换到示例预览。");
+    if (!isTauriAvailable()) {
+      set({ preview: createMockPreviewData(), loading: false, progressMessage: "切换到示例预览", progressPercent: 100 });
+      state.appendLog("warning", result.message ?? "解析预览失败，已切换到示例预览。");
+      return false;
+    }
+
+    set({ loading: false, progressMessage: "解析预览失败", progressPercent: 100 });
+    state.appendLog("warning", result.message ?? "解析预览失败。");
+    return false;
   },
   runSummary: async () => {
     const state = get();
@@ -141,11 +164,18 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
         progressPercent: 100,
       });
       state.appendLog("success", "汇总结果已刷新。");
-      return;
+      return true;
     }
 
-    set({ preview: createMockPreviewData(), loading: false, progressMessage: "切换到示例汇总", progressPercent: 100 });
-    state.appendLog("warning", result.message ?? "汇总构建失败，已切换到示例数据。");
+    if (!isTauriAvailable()) {
+      set({ preview: createMockPreviewData(), loading: false, progressMessage: "切换到示例汇总", progressPercent: 100 });
+      state.appendLog("warning", result.message ?? "汇总构建失败，已切换到示例数据。");
+      return false;
+    }
+
+    set({ loading: false, progressMessage: "汇总构建失败", progressPercent: 100 });
+    state.appendLog("warning", result.message ?? "汇总构建失败。");
+    return false;
   },
   runNotice: async () => {
     const state = get();
@@ -168,11 +198,19 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
         progressPercent: 100,
       });
       state.appendLog("success", "通报名单已刷新。");
-      return;
+      return true;
     }
 
     set({ loading: false, progressMessage: "通报名单生成失败", progressPercent: 100 });
     state.appendLog("warning", result.message ?? "通报名单生成失败。请先生成汇总结果。\n");
+    return false;
+  },
+  runPrimaryFlow: async () => {
+    const summaryOk = await get().runSummary();
+    if (!summaryOk) {
+      return false;
+    }
+    return get().runNotice();
   },
   exportSummaryXlsx: async (outputPath, includeDetail, includeNeedDays, includeNotice) => {
     const state = get();
@@ -219,6 +257,10 @@ export const useAppStore = create<AppState & AppActions>((set, get) => ({
       inputFiles: [],
       rules: createMockRules(),
       noticeRules: createMockNoticeRules(),
+      year: current.year,
+      month: current.month,
+      restDays: [],
+      startRow: 1,
       progressMessage: "已切换到示例数据",
       progressPercent: 100,
     }),

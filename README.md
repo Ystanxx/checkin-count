@@ -14,6 +14,9 @@
 
 - 多文件、多工作表读取
 - 支持 `xls`、`xlsx`、`xlsm`
+- 首屏简化为“导入文件 -> 选择月份与休息日 -> 处理 -> 导出”
+- 高级菜单内提供规则配置、预览、日志和更多导出
+- 本地自动保存常用配置
 - 更稳健的“三行一人”解析
 - AM / NOON 时间窗口配置
 - 汇总表、明细表、需要打卡日、通报名单预览
@@ -97,7 +100,11 @@ cargo bench
 
 ## Windows 打包
 
-当前仓库默认只产出 `exe`，不再生成 `msi`、`nsis` 安装包。
+当前仓库支持：
+
+- 绿色版 `exe`
+- `NSIS` 安装包
+- `MSI` 安装包
 
 本地构建：
 
@@ -110,13 +117,15 @@ pwsh -File .\scripts\build-win.ps1
 ```powershell
 pnpm install
 pnpm build
-pnpm tauri build --no-bundle
+pnpm tauri build
 ```
 
-构建完成后的可执行文件位于：
+构建完成后的产物位于：
 
 ```text
 src-tauri/target/release/*.exe
+src-tauri/target/release/bundle/nsis/*.exe
+src-tauri/target/release/bundle/msi/*.msi
 ```
 
 ## GitHub Actions
@@ -124,13 +133,13 @@ src-tauri/target/release/*.exe
 仓库已配置 Windows 云端构建工作流：
 
 - 工作流文件：`/.github/workflows/windows-build.yml`
-- 产物类型：仅 `exe`
+- 产物类型：`exe` + `nsis` + `msi`
 
 下载方式：
 
 1. 打开仓库的 `Actions`
-2. 进入最新一次 `build-windows-exe`
-3. 在页面底部 `Artifacts` 下载 `team-attendance-exe-*`
+2. 进入最新一次 `build-windows-installer`
+3. 在页面底部 `Artifacts` 下载 `team-attendance-installer-*`
 
 ## 隐私与安全
 

@@ -40,6 +40,26 @@ export function createMockNoticeRules(): NoticeRules {
   };
 }
 
+export function createEmptyPreviewData(): PreviewData {
+  return {
+    recognizedNames: [],
+    worksheetPreviews: [],
+    sampleBlocks: [],
+    summaryRows: [],
+    detailRows: [],
+    needDayRows: [],
+    noticeRows: [],
+    warnings: [],
+    stats: {
+      files: 0,
+      sheets: 0,
+      people: 0,
+      blocks: 0,
+      records: 0,
+    },
+  };
+}
+
 function createMockSummaryRow(index: number): SummaryRow {
   const needPunchDays = 22;
   const actualPunchDays = Math.max(0, needPunchDays - index);

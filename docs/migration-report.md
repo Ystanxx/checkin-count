@@ -69,6 +69,7 @@
 4. 新系统把窗口边界改为规则配置，而不是常量散落
 5. 新系统新增通报名单、阈值组合和导出能力
 6. 新系统默认日志不再暴露完整绝对路径
+7. 新系统首屏改为面向非技术用户的简化流程，高级能力收纳到菜单中
 
 ## 4. 修复的旧缺陷
 
@@ -81,7 +82,7 @@
 ## 5. 剩余风险
 
 1. `cargo bench` 仍未实际执行，性能数值需要后补
-2. GitHub Actions 需要等待本次推送后重新生成最新 `exe` 产物
+2. GitHub Actions 需要等待本次推送后重新生成最新安装包产物
 3. 目标机器若缺少 `WebView2 Runtime` 或 `Visual C++ Runtime`，仍可能影响运行
 
 ## 6. 本地运行方式
@@ -126,7 +127,7 @@ pnpm build
 pnpm tauri:build
 ```
 
-当前默认仅产出 `exe`，不再生成 `msi`、`nsis` 安装包。
+当前默认产出绿色版 `exe`、`nsis` 安装包和 `msi` 安装包。
 
 ## 8. 测试结果
 
@@ -178,4 +179,4 @@ pnpm tauri:build
 
 全部落到当前工作区。
 
-当前已完成本地前端构建、Rust 测试与 Windows release `exe` 构建；剩余未闭环项主要是 benchmark 实测数据与本次推送后的 GitHub Actions 重新产物验证。
+当前已完成本地前端构建、Rust 测试与 Windows release `exe` / `nsis` / `msi` 构建；剩余未闭环项主要是 benchmark 实测数据与本次推送后的 GitHub Actions 重新产物验证。

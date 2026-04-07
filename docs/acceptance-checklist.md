@@ -32,8 +32,10 @@
 - [x] 发布说明 `docs/release.md` 已生成
 - [x] 构建脚本 `scripts/build-win.ps1` 已生成
 - [x] 当前机器已产出 `.exe`
+- [x] 当前机器已产出 `nsis` 安装包
+- [x] 当前机器已产出 `msi` 安装包
 
 ## 阻塞项
 
 - [ ] `cargo bench` 尚未实际执行
-- [ ] GitHub Actions 需在本次推送后重新生成最新 `exe` 产物
+- [ ] GitHub Actions 需在本次推送后重新生成最新安装包产物

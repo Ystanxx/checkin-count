@@ -11,7 +11,10 @@
 ## Windows Release 配置
 
 1. Tauri 配置文件：`src-tauri/tauri.conf.json`
-2. 当前默认仅产出 `exe`
+2. 当前默认产出：
+   - 绿色版 `exe`
+   - `nsis` 安装包
+   - `msi` 安装包
 3. Release 构建应使用：
 
 ```powershell
@@ -40,7 +43,7 @@ pnpm tauri:build
 
 1. 升级前备份旧导出目录
 2. 新旧版本不要共用临时目录
-3. 如需回滚，保留上一版 `.exe`
+3. 如需回滚，保留上一版安装包或 `.exe`
 
 ## 已知限制
 

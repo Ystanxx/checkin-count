@@ -1,16 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "../store/appStore";
-import { FileSelectPage } from "../pages/FileSelectPage";
-import { RulesPage } from "../pages/RulesPage";
-import { PreviewPage } from "../pages/PreviewPage";
-import { ExportPage } from "../pages/ExportPage";
-import { LogPanel } from "./LogPanel";
+import type { AttendanceRules, NoticeRules } from "../types/attendance";
 import { ProgressBanner } from "./ProgressBanner";
+import { SimpleHome } from "./SimpleHome";
+import { AdvancedMenu } from "./AdvancedMenu";
 import { subscribeProgress } from "../utils/tauri";
+import { saveAppPreferences } from "../utils/preferences";
 
 export function AppShell() {
+  const files = useAppStore((state) => state.inputFiles);
   const preview = useAppStore((state) => state.preview);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const year = useAppStore((state) => state.year);
+  const month = useAppStore((state) => state.month);
+  const startRow = useAppStore((state) => state.startRow);
+  const restDays = useAppStore((state) => state.restDays);
+  const rules = useAppStore((state) => state.rules);
+  const noticeRules = useAppStore((state) => state.noticeRules);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     let disposed = false;
@@ -39,55 +45,47 @@ export function AppShell() {
     };
   }, []);
 
-  const quickStats = useMemo(
-    () => [
-      { label: "文件", value: preview.stats.files },
-      { label: "工作表", value: preview.stats.sheets },
-      { label: "人员", value: preview.stats.people },
-      { label: "记录", value: preview.stats.records },
-    ],
-    [preview.stats],
-  );
+  useEffect(() => {
+    saveAppPreferences({
+      year,
+      month,
+      startRow,
+      restDays,
+      rules: rules as AttendanceRules,
+      noticeRules: noticeRules as NoticeRules,
+    });
+  }, [year, month, startRow, restDays, rules, noticeRules]);
 
   return (
-    <div className={`app-shell ${sidebarCollapsed ? "is-sidebar-collapsed" : ""}`}>
-      <aside className={`sidebar ${sidebarCollapsed ? "is-collapsed" : ""}`}>
-        <div className="brand-block">
+    <div className="app-shell-simple">
+      <header className="topbar">
+        <div className="topbar-copy">
           <div>
-            <div className="brand-kicker">Tauri v2 + Rust + React</div>
-            <div className="brand-mark">团队打卡数据处理</div>
+            <div className="brand-kicker">本地离线 · Tauri v2 · Rust</div>
+            <div className="brand-mark brand-mark-inline">团队打卡数据处理</div>
           </div>
-          <button
-            className="ghost-button"
-            onClick={() => setSidebarCollapsed((value) => !value)}
-            type="button"
-          >
-            {sidebarCollapsed ? "展开" : "收起"}
-          </button>
         </div>
-        <div className="sidebar-stats">
-          {quickStats.map((item) => (
-            <div className="stat-card" key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </div>
-          ))}
+        <div className="topbar-stats">
+          <div className="stat-card">
+            <span>文件</span>
+            <strong>{files.length}</strong>
+          </div>
+          <div className="stat-card">
+            <span>人员</span>
+            <strong>{preview.stats.people}</strong>
+          </div>
+          <div className="stat-card">
+            <span>待通报</span>
+            <strong>{preview.noticeRows.length}</strong>
+          </div>
         </div>
-        <div className="sidebar-note">
-          本地离线处理，不接入远程 API，不在前端解析 Excel。
-        </div>
-      </aside>
+      </header>
 
       <main className="main-panel">
         <ProgressBanner />
-        <section className="workspace-grid">
-          <FileSelectPage />
-          <ExportPage />
-          <RulesPage />
-          <PreviewPage />
-          <LogPanel />
-        </section>
+        <SimpleHome onOpenAdvanced={() => setAdvancedOpen(true)} />
       </main>
+      <AdvancedMenu onClose={() => setAdvancedOpen(false)} open={advancedOpen} />
     </div>
   );
 }
